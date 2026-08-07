@@ -6,10 +6,12 @@ import { icon } from './icons.js';
 import { dashboardData, currentUser, workspaces, quickActions } from './mock-data.js';
 import { getState } from './store.js';
 import { setTheme } from './theme.js';
-import { timeAgo, todayKey } from './date-utils.js';
+import { timeAgo, todayKey, formatDate } from './date-utils.js';
 import { projects as allProjects } from './projects/data.js';
 import { notes as allNotes } from './notes/data.js';
 import { habits as allHabits } from './habits/data.js';
+import { goals as allGoals } from './goals/data.js';
+import { computeGoalProgress } from './goals/state.js';
 import { computeDashboardStats, computeStreak, computeSuccessRate, dayState, topStreaks, computeTrend, setCompletionStatus } from './habits/state.js';
 import { getEventsInRange } from './calendar/repository.js';
 import { calendar as getCalendarInfo } from './calendar/data.js';
@@ -22,6 +24,7 @@ import {
   TaskItem,
   EventItem,
   ProjectItem,
+  GoalItem,
   NoteItem,
   HabitItem,
   Progress,
@@ -63,6 +66,25 @@ export function renderDashboard(container) {
   const notesBody = recentNotes.length
     ? recentNotes.map((n) => NoteItem(n)).join('')
     : emptyState({ icon: 'fileText', title: 'No notes yet', description: 'Capture your ideas.', size: 'sm' });
+
+  const topGoals = allGoals
+    .filter((g) => g.status !== 'Completed' && g.status !== 'Archived')
+    .sort((a, b) => new Date(a.deadline || '9999-12-31') - new Date(b.deadline || '9999-12-31'))
+    .slice(0, 3);
+
+  const goalsBody = topGoals.length
+    ? topGoals
+        .map((g) =>
+          GoalItem({
+            id: g.id,
+            title: g.title,
+            progress: computeGoalProgress(g),
+            status: g.status,
+            deadline: g.deadline ? formatDate(g.deadline) : null,
+          })
+        )
+        .join('')
+    : emptyState({ icon: 'target', title: 'No goals yet', description: 'Set a goal to start tracking.', size: 'sm' });
 
   const eventsRangeStart = new Date();
   eventsRangeStart.setHours(0, 0, 0, 0);
@@ -133,6 +155,7 @@ export function renderDashboard(container) {
         <div class="dashboard__col dashboard__col--left">
           ${SectionCard({ title: "Today's Overview", action: sectionAction('projects'), content: todayBody })}
           ${SectionCard({ title: 'Recent Projects', action: sectionAction('projects'), content: projectsBody })}
+          ${SectionCard({ title: 'Top Goals', action: sectionAction('goals'), content: goalsBody })}
           ${SectionCard({ title: 'Recent Notes', action: sectionAction('notes'), content: notesBody })}
         </div>
         <div class="dashboard__col dashboard__col--right">

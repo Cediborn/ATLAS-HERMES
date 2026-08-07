@@ -43,6 +43,11 @@ function render(routeId) {
       renderHabitsSkeleton(root);
       renderHabits(root);
     });
+  } else if (item.id === 'goals') {
+    import('./goals/view.js').then(({ renderGoals, renderGoalsSkeleton }) => {
+      renderGoalsSkeleton(root);
+      renderGoals(root);
+    });
   } else {
     renderEmptyState(root, item);
   }

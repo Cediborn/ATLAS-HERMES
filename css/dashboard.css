@@ -220,6 +220,20 @@
 .project-item__title { font-size: var(--text-sm); font-weight: var(--weight-medium); }
 .project-item__meta { font-size: var(--text-xs); color: var(--color-text-tertiary); }
 
+/* ---- GoalItem (same row skeleton as ProjectItem) ---- */
+.goal-item {
+  padding: var(--space-12);
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  transition: background-color var(--duration-micro) var(--ease-atlas);
+}
+.goal-item:hover { background: var(--color-surface-hover); }
+.goal-item__top { display: flex; align-items: center; justify-content: space-between; gap: var(--space-12); }
+.goal-item__title { font-size: var(--text-sm); font-weight: var(--weight-medium); }
+.goal-item__meta { font-size: var(--text-xs); color: var(--color-text-tertiary); }
+
 /* ================= PROGRESS COMPONENT ================= */
 .progress-component { display: flex; flex-direction: column; gap: var(--space-8); }
 .progress-component__label { display: flex; justify-content: space-between; font-size: var(--text-xs); color: var(--color-text-tertiary); }

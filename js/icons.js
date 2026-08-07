@@ -49,6 +49,10 @@ const paths = {
   heart: '<path d="M12 20.5S3.5 15.4 3.5 9.4A4.4 4.4 0 0 1 12 7.2a4.4 4.4 0 0 1 8.5 2.2c0 6-8.5 11.1-8.5 11.1Z"/>',
   upload: '<path d="M12 16V4M12 4 7 9M12 4l5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/>',
   download: '<path d="M12 4v12M12 16 7 11M12 16l5-5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/>',
+  // ---- Added for Goals ----
+  flag: '<path d="M5 21V4"/><path d="M5 4c6-2.5 9 2.5 14 0v9c-5 2.5-8-2.5-14 0"/>',
+  trendingUp: '<path d="m3 17 6-6 4 4 8-8"/><path d="M15 7h6v6"/>',
+  briefcase: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/><path d="M3 12h18"/>',
 };
 
 export function icon(name, { size = 20, strokeWidth = 2, className = '' } = {}) {

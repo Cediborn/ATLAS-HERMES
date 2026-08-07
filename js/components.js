@@ -178,6 +178,18 @@ export function ProjectItem({ id, name, status, lastUpdated, progress }) {
     </div>`;
 }
 
+export function GoalItem({ id, title, progress, status, deadline }) {
+  return `
+    <div class="goal-item" data-id="${id}">
+      <div class="goal-item__top">
+        <span class="goal-item__title">${title}</span>
+        ${Badge({ label: status })}
+      </div>
+      <div class="goal-item__meta">${deadline ? `Deadline ${deadline}` : 'No deadline set'}</div>
+      ${typeof progress === 'number' ? Progress({ percentage: progress, color: 'accent' }) : ''}
+    </div>`;
+}
+
 export function NoteItem({ id, title, editedDate, tag }) {
   return `
     <div class="note-item" data-id="${id}">
