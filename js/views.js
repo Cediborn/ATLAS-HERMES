@@ -12,6 +12,8 @@ import { notes as allNotes } from './notes/data.js';
 import { habits as allHabits } from './habits/data.js';
 import { goals as allGoals } from './goals/data.js';
 import { computeGoalProgress } from './goals/state.js';
+import { resources as allResources } from './learning/data.js';
+import { computeResourceProgress } from './learning/state.js';
 import { computeDashboardStats, computeStreak, computeSuccessRate, dayState, topStreaks, computeTrend, setCompletionStatus } from './habits/state.js';
 import { getEventsInRange } from './calendar/repository.js';
 import { calendar as getCalendarInfo } from './calendar/data.js';
@@ -25,9 +27,9 @@ import {
   EventItem,
   ProjectItem,
   GoalItem,
+  ResourceItem,
   NoteItem,
   HabitItem,
-  Progress,
   Badge,
   emptyState,
 } from './components.js';
@@ -127,12 +129,23 @@ export function renderDashboard(container) {
     return { ...s, value: `${dashboardHabitStats.currentStreak} days`, trend: `${trend >= 0 ? '+' : ''}${trend}% vs last week` };
   });
 
-  const learningBody = d.learning
-    ? `<div class="learning-card">
-        <span class="learning-card__title">${d.learning.title}</span>
-        ${Progress({ percentage: d.learning.progress })}
-        <div class="learning-card__meta">${d.learning.chapterProgress}</div>
-      </div>`
+  const activeResources = allResources
+    .filter((r) => r.status === 'In Progress')
+    .sort((a, b) => computeResourceProgress(b) - computeResourceProgress(a))
+    .slice(0, 3);
+
+  const learningBody = activeResources.length
+    ? activeResources
+        .map((r) =>
+          ResourceItem({
+            id: r.id,
+            title: r.title,
+            typeLabel: `${r.type[0].toUpperCase() + r.type.slice(1)} · ${r.author}`,
+            progress: computeResourceProgress(r),
+            status: r.status,
+          })
+        )
+        .join('')
     : emptyState({ icon: 'bookOpen', title: 'Nothing in progress', description: 'Start a course or book.', size: 'sm' });
 
   container.innerHTML = `

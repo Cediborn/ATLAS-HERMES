@@ -48,6 +48,11 @@ function render(routeId) {
       renderGoalsSkeleton(root);
       renderGoals(root);
     });
+  } else if (item.id === 'learning') {
+    import('./learning/view.js').then(({ renderLearning, renderLearningSkeleton }) => {
+      renderLearningSkeleton(root);
+      renderLearning(root);
+    });
   } else {
     renderEmptyState(root, item);
   }

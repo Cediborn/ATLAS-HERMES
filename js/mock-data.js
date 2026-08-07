@@ -63,7 +63,6 @@ export const dashboardData = {
   ],
   // habits[] retired — the real Habits module (js/habits/data.js) is the
   // canonical source now; the dashboard preview reads live from it.
-  learning: { title: 'Deep Work — Cal Newport', progress: 62, chapterProgress: 'Ch. 6 of 9' },
 };
 
 // Landing-page hero demo: cycles through example quick-capture inputs and

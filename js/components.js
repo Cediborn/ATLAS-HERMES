@@ -190,6 +190,18 @@ export function GoalItem({ id, title, progress, status, deadline }) {
     </div>`;
 }
 
+export function ResourceItem({ id, title, typeLabel, progress, status }) {
+  return `
+    <div class="resource-item" data-id="${id}">
+      <div class="resource-item__top">
+        <span class="resource-item__title">${title}</span>
+        ${Badge({ label: status })}
+      </div>
+      <div class="resource-item__meta">${typeLabel}</div>
+      ${typeof progress === 'number' ? Progress({ percentage: progress, color: 'accent' }) : ''}
+    </div>`;
+}
+
 export function NoteItem({ id, title, editedDate, tag }) {
   return `
     <div class="note-item" data-id="${id}">
