@@ -62,6 +62,9 @@ const paths = {
   creditCard: '<rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M2.5 10h19"/>',
   banknote: '<rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6.5 12h.01M17.5 12h.01"/>',
   piggy: '<path d="M19 10.5c1.7 0 2 1.6 2 2.7 0 1.8-1.4 3.1-3.2 3.3L17 20h-3l-.5-2.5h-3.5l-.5 2.5h-3l-.8-3.4A6 6 0 0 1 10 5c0-1.5.3-2.5 2-2.5 1.4 0 1.7 1 2.7 1.4A6.5 6.5 0 0 1 19 4a5 5 0 0 1-1.2 2.3A5.2 5.2 0 0 1 19 10.5Z"/><circle cx="15.5" cy="10.5" r="1"/>',
+  // ---- Added for Books ----
+  minus: '<path d="M5 12h14"/>',
+  chevronUp: '<path d="m6 15 6-6 6 6"/>',
 };
 
 export function icon(name, { size = 20, strokeWidth = 2, className = '' } = {}) {

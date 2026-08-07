@@ -16,6 +16,7 @@ import {
   categoryProgress,
   statusDistribution,
   buildTimeline,
+  enrichGoal,
   SORT_OPTIONS,
   formatDate,
   timeAgo,
@@ -375,7 +376,7 @@ function initDetailPanel() {
 }
 
 function openDetail(goalId) {
-  const g = goals.find((x) => x.id === goalId);
+  const g = enrichGoal(goals.find((x) => x.id === goalId));
   if (!g) return;
   lastFocusedBeforeDetail = document.activeElement;
   const overlay = document.getElementById('goal-detail-overlay');
@@ -398,7 +399,7 @@ function refreshDetailPanel() {
   const panel = document.getElementById('goal-detail-panel');
   const scrollEl = panel.querySelector('.goal-detail-panel__scroll');
   const goalId = panel.querySelector('[data-goal-id]')?.dataset.goalId;
-  const g = goals.find((x) => x.id === goalId);
+  const g = enrichGoal(goals.find((x) => x.id === goalId));
   if (!g) return;
   const scrollTop = scrollEl?.scrollTop || 0;
   panel.innerHTML = renderDetailContent(g);

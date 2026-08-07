@@ -202,6 +202,18 @@ export function ResourceItem({ id, title, typeLabel, progress, status }) {
     </div>`;
 }
 
+export function BookItem({ id, title, author, progress, status }) {
+  return `
+    <div class="book-item" data-id="${id}">
+      <div class="book-item__top">
+        <span class="book-item__title">${title}</span>
+        ${Badge({ label: status })}
+      </div>
+      <div class="book-item__meta">${author}</div>
+      ${typeof progress === 'number' ? Progress({ percentage: progress, color: 'accent' }) : ''}
+    </div>`;
+}
+
 export function TransactionItem({ id, title, category, amount, type, icon: iconName = 'wallet', account }) {
   return `
     <div class="transaction-item" data-id="${id}">

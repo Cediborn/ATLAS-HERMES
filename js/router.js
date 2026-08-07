@@ -58,6 +58,16 @@ function render(routeId) {
       renderFinanceSkeleton(root);
       renderFinance(root);
     });
+  } else if (item.id === 'books') {
+    import('./books/view.js').then(({ renderBooks, renderBooksSkeleton }) => {
+      renderBooksSkeleton(root);
+      renderBooks(root);
+    });
+  } else if (item.id === 'coding') {
+    import('./coding/view.js').then(({ renderCoding, renderCodingSkeleton }) => {
+      renderCodingSkeleton(root);
+      renderCoding(root);
+    });
   } else {
     renderEmptyState(root, item);
   }
