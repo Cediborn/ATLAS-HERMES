@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Atlas — One calm system for everything</title>
+  <meta name="description" content="Atlas is a personal operating system: tasks, notes, calendar, habits, learning, and finance in one calm, fast, keyboard-first system." />
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+
+  <script>
+    (function () {
+      try {
+        var raw = localStorage.getItem('atlas:state');
+        var saved = raw ? JSON.parse(raw) : {};
+        var theme = saved.theme || 'system';
+        var isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+      } catch (e) {}
+    })();
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="css/tokens.css" />
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/components.css" />
+  <link rel="stylesheet" href="css/landing.css" />
+</head>
+<body class="landing">
+  <nav class="landing__nav">
+    <div class="landing__logo">
+      <img src="assets/favicon.svg" width="28" height="28" alt="" />
+      Atlas
+    </div>
+    <div class="landing__nav-links">
+      <a href="#philosophy">Philosophy</a>
+      <a href="#pillars">Pillars</a>
+    </div>
+    <a href="app/index.html" class="btn btn--primary">Launch Atlas</a>
+  </nav>
+
+  <section class="hero">
+    <span class="hero__eyebrow">Personal operating system</span>
+    <h1>Type what's on your mind.<br />Atlas handles the rest.</h1>
+    <p class="hero__lede">Tasks, notes, calendar, habits, learning, and finance — one calm, fast, keyboard-first system. Not seven apps stitched together.</p>
+
+    <div class="hero__actions">
+      <a href="app/index.html" class="btn btn--primary">Launch Atlas</a>
+      <a href="#pillars" class="btn btn--secondary">See how it works</a>
+    </div>
+
+    <div class="hero__visual">
+      <div class="palette-demo">
+        <div class="palette-demo__input">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+          <span class="palette-demo__typed" id="palette-typed"></span>
+        </div>
+        <div class="palette-demo__result" id="palette-result">
+          <span class="palette-demo__result-icon" id="palette-result-icon"></span>
+          <span>
+            <div class="palette-demo__result-title" id="palette-result-title"></div>
+            <div class="palette-demo__result-meta">
+              <span class="badge" id="palette-result-time"></span>
+              <span class="badge badge--accent" id="palette-result-tag"></span>
+            </div>
+          </span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="philosophy" id="philosophy"></section>
+
+  <section class="pillars" id="pillars">
+    <div class="pillars__inner">
+      <div class="pillars__heading">
+        <h2>Eight pillars, one system</h2>
+        <p>Every entity can link to any other — a note to a task, a task to an event — and all of it feeds one activity log.</p>
+      </div>
+      <div class="pillars__grid" id="pillars-grid"></div>
+    </div>
+  </section>
+
+  <footer class="landing__footer">
+    <span>Atlas — built with intention.</span>
+    <a href="app/index.html">Launch Atlas →</a>
+  </footer>
+
+  <script type="module" src="js/landing.js"></script>
+</body>
+</html>
