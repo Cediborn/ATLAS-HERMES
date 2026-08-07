@@ -226,6 +226,18 @@ export function TransactionItem({ id, title, category, amount, type, icon: iconN
     </div>`;
 }
 
+export function CodingItem({ id, title, kind, progress, status, time }) {
+  return `
+    <div class="coding-item" data-id="${id}">
+      <div class="coding-item__top">
+        <span class="coding-item__title">${title}</span>
+        ${Badge({ label: status })}
+      </div>
+      <div class="coding-item__meta">${kind === 'build' ? 'Build' : 'Problem'} · ${time}</div>
+      ${typeof progress === 'number' ? Progress({ percentage: progress, color: 'accent' }) : ''}
+    </div>`;
+}
+
 export function NoteItem({ id, title, editedDate, tag }) {
   return `
     <div class="note-item" data-id="${id}">

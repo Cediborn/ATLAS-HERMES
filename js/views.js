@@ -18,6 +18,8 @@ import { transactions as allTransactions, accounts as allAccounts, CATEGORY_CONF
 import { formatCurrency as formatMoney } from './finance/state.js';
 import { books as allBooks } from './books/data.js';
 import { computeBookProgress } from './books/state.js';
+import { codingItems as allCoding } from './coding/data.js';
+import { computeItemProgress } from './coding/state.js';
 import { computeDashboardStats, computeStreak, computeSuccessRate, dayState, topStreaks, computeTrend, setCompletionStatus } from './habits/state.js';
 import { getEventsInRange } from './calendar/repository.js';
 import { calendar as getCalendarInfo } from './calendar/data.js';
@@ -33,6 +35,7 @@ import {
   GoalItem,
   ResourceItem,
   BookItem,
+  CodingItem,
   TransactionItem,
   NoteItem,
   HabitItem,
@@ -194,6 +197,26 @@ export function renderDashboard(container) {
         .join('')
     : emptyState({ icon: 'book', title: 'Nothing on the go', description: 'Start reading a book.', size: 'sm' });
 
+  const activeCoding = allCoding
+    .filter((c) => c.status === 'In Progress')
+    .sort((a, b) => computeItemProgress(b) - computeItemProgress(a))
+    .slice(0, 3);
+
+  const codingBody = activeCoding.length
+    ? activeCoding
+        .map((c) =>
+          CodingItem({
+            id: c.id,
+            title: c.title,
+            kind: c.kind,
+            progress: computeItemProgress(c),
+            status: c.status,
+            time: c.stepsTotal > 0 ? `${c.stepsDone}/${c.stepsTotal} steps` : `${c.timeSpentMin} min`,
+          })
+        )
+        .join('')
+    : emptyState({ icon: 'code', title: 'Nothing in the queue', description: 'Pick up a problem or build.', size: 'sm' });
+
   container.innerHTML = `
     <div class="dashboard">
       <div class="dashboard__hero">
@@ -222,6 +245,7 @@ export function renderDashboard(container) {
           ${SectionCard({ title: 'Current Streaks', action: sectionAction('habits'), content: habitsBody })}
           ${SectionCard({ title: 'Finance', action: sectionAction('finance'), content: financeBody })}
           ${SectionCard({ title: 'Currently Reading', action: sectionAction('books'), content: booksBody })}
+          ${SectionCard({ title: 'Coding', action: sectionAction('coding'), content: codingBody })}
           ${SectionCard({ title: 'Learning Progress', action: sectionAction('learning'), content: learningBody })}
         </div>
       </div>

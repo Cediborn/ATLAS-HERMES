@@ -262,6 +262,20 @@
 .book-item__title { font-size: var(--text-sm); font-weight: var(--weight-medium); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .book-item__meta { font-size: var(--text-xs); color: var(--color-text-tertiary); }
 
+/* ---- CodingItem (dashboard preview row) ---- */
+.coding-item {
+  padding: var(--space-12);
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  transition: background-color var(--duration-micro) var(--ease-atlas);
+}
+.coding-item:hover { background: var(--color-surface-hover); }
+.coding-item__top { display: flex; align-items: center; justify-content: space-between; gap: var(--space-12); }
+.coding-item__title { font-size: var(--text-sm); font-weight: var(--weight-medium); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.coding-item__meta { font-size: var(--text-xs); color: var(--color-text-tertiary); }
+
 /* ---- TransactionItem (dashboard preview row) ---- */
 .transaction-item {
   display: flex;
