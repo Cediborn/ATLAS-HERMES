@@ -14,6 +14,8 @@ import { goals as allGoals } from './goals/data.js';
 import { computeGoalProgress } from './goals/state.js';
 import { resources as allResources } from './learning/data.js';
 import { computeResourceProgress } from './learning/state.js';
+import { transactions as allTransactions, accounts as allAccounts, CATEGORY_CONFIG } from './finance/data.js';
+import { formatCurrency as formatMoney } from './finance/state.js';
 import { computeDashboardStats, computeStreak, computeSuccessRate, dayState, topStreaks, computeTrend, setCompletionStatus } from './habits/state.js';
 import { getEventsInRange } from './calendar/repository.js';
 import { calendar as getCalendarInfo } from './calendar/data.js';
@@ -28,6 +30,7 @@ import {
   ProjectItem,
   GoalItem,
   ResourceItem,
+  TransactionItem,
   NoteItem,
   HabitItem,
   Badge,
@@ -148,6 +151,27 @@ export function renderDashboard(container) {
         .join('')
     : emptyState({ icon: 'bookOpen', title: 'Nothing in progress', description: 'Start a course or book.', size: 'sm' });
 
+  const recentTransactions = allTransactions
+    .slice()
+    .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .slice(0, 3);
+
+  const financeBody = recentTransactions.length
+    ? recentTransactions
+        .map((t) =>
+          TransactionItem({
+            id: t.id,
+            title: t.description,
+            category: CATEGORY_CONFIG[t.category].label,
+            amount: formatMoney(t.amount),
+            type: t.type,
+            icon: CATEGORY_CONFIG[t.category].icon,
+            account: allAccounts.find((a) => a.id === t.accountId)?.name,
+          })
+        )
+        .join('')
+    : emptyState({ icon: 'wallet', title: 'No transactions yet', description: 'Add an income or expense.', size: 'sm' });
+
   container.innerHTML = `
     <div class="dashboard">
       <div class="dashboard__hero">
@@ -174,6 +198,7 @@ export function renderDashboard(container) {
         <div class="dashboard__col dashboard__col--right">
           ${SectionCard({ title: 'Upcoming Events', action: sectionAction('calendar'), content: eventsBody })}
           ${SectionCard({ title: 'Current Streaks', action: sectionAction('habits'), content: habitsBody })}
+          ${SectionCard({ title: 'Finance', action: sectionAction('finance'), content: financeBody })}
           ${SectionCard({ title: 'Learning Progress', action: sectionAction('learning'), content: learningBody })}
         </div>
       </div>

@@ -202,6 +202,18 @@ export function ResourceItem({ id, title, typeLabel, progress, status }) {
     </div>`;
 }
 
+export function TransactionItem({ id, title, category, amount, type, icon: iconName = 'wallet', account }) {
+  return `
+    <div class="transaction-item" data-id="${id}">
+      <span class="transaction-item__icon">${icon(iconName, { size: 17 })}</span>
+      <span class="transaction-item__body">
+        <span class="transaction-item__title">${title}</span>
+        <span class="transaction-item__meta">${account ? `${account} · ` : ''}${category}</span>
+      </span>
+      <span class="transaction-item__amount transaction-item__amount--${type}">${type === 'income' ? '+' : '\u2212'}${amount}</span>
+    </div>`;
+}
+
 export function NoteItem({ id, title, editedDate, tag }) {
   return `
     <div class="note-item" data-id="${id}">

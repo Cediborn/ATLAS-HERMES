@@ -53,6 +53,11 @@ function render(routeId) {
       renderLearningSkeleton(root);
       renderLearning(root);
     });
+  } else if (item.id === 'finance') {
+    import('./finance/view.js').then(({ renderFinance, renderFinanceSkeleton }) => {
+      renderFinanceSkeleton(root);
+      renderFinance(root);
+    });
   } else {
     renderEmptyState(root, item);
   }
