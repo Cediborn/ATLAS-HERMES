@@ -8,11 +8,14 @@ import { renderNav, initSidebarControls } from './sidebar.js';
 import { initTopbar } from './topbar.js';
 import { initCommandPalette } from './command-palette.js';
 import { initRouter, navigate } from './router.js';
+import { initLuna } from './luna.js';
 
 initTheme();
 renderNav(navItems);
 initSidebarControls();
 initTopbar();
+
+initLuna();
 
 initCommandPalette({
   navItems,
