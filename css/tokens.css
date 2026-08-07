@@ -26,13 +26,17 @@
   --weight-semibold: 600;
   --weight-bold: 700;
 
-  /* ---- Spacing (4px base unit) ---- */
+  /* ---- Spacing (4px base unit, half-steps 6/10/20/40 for fine tuning) ---- */
   --space-4: 4px;
+  --space-6: 6px;
   --space-8: 8px;
+  --space-10: 10px;
   --space-12: 12px;
   --space-16: 16px;
+  --space-20: 20px;
   --space-24: 24px;
   --space-32: 32px;
+  --space-40: 40px;
   --space-48: 48px;
   --space-64: 64px;
   --space-96: 96px;
