@@ -349,3 +349,19 @@ README and deliberately kept as the `db.js`/`persistence.js` seam.
 - Verified in headless Chrome: `tests/luna-landing-driver.mjs` (14/14 —
   collapse/persist/expand, minimize, hero badges, 12 cards, palette demo)
   plus the existing route sweep (11/11) and UI e2e (9/9).
+
+### 1.9.1 — Fix: LUNA could not be closed
+
+- **Root cause:** `.luna-panel { display: flex }` (author CSS) overrode the UA
+  `[hidden] { display: none }` rule because the stylesheets had no `[hidden]`
+  reset — so the panel ignored the `hidden` attribute and stayed on screen
+  even after Close, and was visible on page load. Reproduced with real mouse
+  clicks (CDP Input) checking computed `display`, which synthetic
+  `element.click()` tests cannot catch.
+- **Fix:** global `[hidden] { display: none !important; }` reset in
+  `css/base.css` (standard reset; also hardens every other `hidden` element).
+- **Deployment:** bumped service worker `VERSION` to `atlas-v2` in `app/sw.js`
+  so clients drop the stale cache and actually receive the fix.
+- Verified: `tests/luna-close-repro.mjs` (load → hidden, FAB click → open,
+  X click → closed with `display: none`) + full `tests/luna-landing-driver.mjs`
+  (14/14).

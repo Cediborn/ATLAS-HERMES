@@ -8,6 +8,13 @@
   margin: 0;
 }
 
+/* The hidden attribute must always win — otherwise author display rules
+   (e.g. .luna-panel { display: flex }) override it and "hidden" elements
+   stay visible. This is the standard reset. */
+[hidden] {
+  display: none !important;
+}
+
 html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;

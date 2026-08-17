@@ -4,7 +4,7 @@
 // refreshed in the background (stale-while-revalidate). Bump VERSION when
 // deploying a new build so clients drop the old cache and pick it up.
 
-const VERSION = 'atlas-v1';
+const VERSION = 'atlas-v2';
 const CACHE = `atlas-${VERSION}`;
 const SHELL = ['./index.html'];
 
