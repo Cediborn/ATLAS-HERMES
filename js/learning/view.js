@@ -5,6 +5,7 @@ import { icon } from '../icons.js';
 import { createPopover } from '../popover.js';
 import { StatCard, SectionCard, emptyState } from '../components.js';
 import { navigate } from '../router.js';
+import { saveResources } from '../persistence.js';
 import { resources, RESOURCE_TYPES, LEARNING_STATUSES, LEARNING_SUBJECTS, SUBJECT_CONFIG, LEARNING_STATUS_CONFIG } from './data.js';
 import {
   getState,
@@ -26,12 +27,12 @@ import {
   ResourceRow,
   ResourceHeader,
   ResourceProgress,
-  UnitChecklist,
   ResourceSkeleton,
   LearningEmptyState,
   ResourceSubject,
   formatMinutes,
 } from './components.js';
+import { openResourceDialog } from './dialog.js';
 import { goals } from '../goals/data.js';
 import { projects } from '../projects/data.js';
 import { habits } from '../habits/data.js';
@@ -215,7 +216,7 @@ function initToolbar() {
   });
 
   document.getElementById('learning-new').addEventListener('click', () => {
-    document.getElementById('search-trigger').click();
+    openResourceDialog('create', null, refreshAll);
   });
 
   initFilterPopover();
@@ -390,7 +391,15 @@ function refreshDetailPanel() {
   const scrollTop = scrollEl?.scrollTop || 0;
   panel.innerHTML = renderDetailContent(r);
   panel.querySelector('#resource-detail-close').addEventListener('click', closeDetail);
+  panel.querySelector('#resource-detail-close').focus();
   if (scrollEl) scrollEl.scrollTop = scrollTop;
+}
+
+function refreshAll() {
+  invalidateVisibleResourcesCache();
+  renderStats();
+  renderCharts();
+  renderView();
 }
 
 function renderDetailContent(r) {
@@ -404,6 +413,10 @@ function renderDetailContent(r) {
     <button type="button" class="icon-btn resource-detail-panel__close" id="resource-detail-close" aria-label="Close panel">${icon('x', { size: 18 })}</button>
     <div class="resource-detail-panel__scroll" data-resource-id="${r.id}">
       ${ResourceHeader({ resource: r })}
+      <div class="resource-detail-panel__header-actions">
+        <button type="button" class="btn btn--secondary" id="resource-detail-edit">${icon('edit', { size: 15 })}<span>Edit</span></button>
+        <button type="button" class="btn btn--secondary" id="resource-detail-delete">${icon('trash', { size: 15 })}<span>Delete</span></button>
+      </div>
       <p class="resource-detail-panel__desc">${r.description}</p>
 
       ${detailSection('Progress', `
@@ -417,7 +430,7 @@ function renderDetailContent(r) {
         </div>
       `)}
 
-      ${detailSection('Units', UnitChecklist({ resource: r }))}
+      ${detailSection('Units', unitsSection(r))}
 
       ${detailSection('Links', `
         ${linkedGoals.length || linkedProjects.length || linkedHabits.length
@@ -469,26 +482,82 @@ function statBlock(value, label) {
   return `<div class="resource-detail-panel__stat"><span class="resource-detail-panel__stat-value">${value}</span><span class="resource-detail-panel__stat-label">${label}</span></div>`;
 }
 
-// Panel event delegation — unit toggles + link navigation.
+function unitId() {
+  return `u${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+}
+
+function unitsSection(r) {
+  const list = r.units || [];
+  const done = list.filter((u) => u.done).length;
+  const rows = list.length
+    ? `<div class="resource-units__list">${list
+        .map(
+          (u) => `
+        <div class="resource-unit${u.done ? ' is-done' : ''}" data-unit-id="${u.id}">
+          <button type="button" class="resource-unit__check" role="checkbox" aria-checked="${u.done}" aria-label="${u.done ? 'Mark incomplete' : 'Mark complete'}: ${u.title}">${icon('check', { size: 11 })}</button>
+          <span class="resource-unit__title">${u.title}</span>
+          <button type="button" class="icon-btn resource-unit__delete" data-unit-delete="${u.id}" aria-label="Delete unit">${icon('trash', { size: 13 })}</button>
+        </div>`
+        )
+        .join('')}</div>`
+    : emptyState({ icon: 'checklist', title: 'No units yet', description: 'Break this resource into checkable units.', size: 'sm' });
+  return `
+    <div class="resource-units">
+      <div class="resource-units__summary">${done} of ${list.length} unit${list.length === 1 ? '' : 's'} complete</div>
+      ${rows}
+      <form class="subitem-add" id="unit-add-form">
+        <input id="unit-add-title" type="text" placeholder="New unit\u2026" aria-label="Unit title" />
+        <button type="submit" class="btn btn--primary btn--sm">${icon('plus', { size: 14 })}<span>Add</span></button>
+      </form>
+    </div>`;
+}
+
+// Panel event delegation — unit toggles/add/delete, edit/delete, links.
 function initPanelInteractions() {
   const panel = document.getElementById('resource-detail-panel');
   if (panel.dataset.interactions) return;
   panel.dataset.interactions = '1';
 
   panel.addEventListener('click', (e) => {
+    const resourceEl = panel.querySelector('[data-resource-id]');
+    const r = resources.find((x) => x.id === resourceEl?.dataset.resourceId);
+
     const check = e.target.closest('.resource-unit__check');
-    if (check) {
-      const row = check.closest('.resource-unit');
-      const resourceEl = panel.querySelector('[data-resource-id]');
-      const r = resources.find((x) => x.id === resourceEl?.dataset.resourceId);
-      const u = r?.units?.find((x) => x.id === row.dataset.unitId);
-      if (r && u) {
+    if (check && r) {
+      const u = r.units?.find((x) => x.id === check.closest('.resource-unit').dataset.unitId);
+      if (u) {
         u.done = !u.done;
-        invalidateVisibleResourcesCache();
-        refreshDetailPanel();
-        renderView();
-        renderStats();
-        renderCharts();
+        r.updatedAt = new Date().toISOString().slice(0, 10);
+        saveResources();
+        afterUnitChange();
+      }
+      return;
+    }
+
+    const del = e.target.closest('[data-unit-delete]');
+    if (del && r && r.units) {
+      const idx = r.units.findIndex((u) => u.id === del.dataset.unitDelete);
+      if (idx !== -1) r.units.splice(idx, 1);
+      r.updatedAt = new Date().toISOString().slice(0, 10);
+      saveResources();
+      afterUnitChange();
+      return;
+    }
+
+    const edit = e.target.closest('#resource-detail-edit');
+    if (edit && r) {
+      openResourceDialog('edit', r, () => { refreshDetailPanel(); refreshAll(); });
+      return;
+    }
+
+    const remove = e.target.closest('#resource-detail-delete');
+    if (remove && r) {
+      if (window.confirm(`Delete "${r.title}"? This can\u2019t be undone.`)) {
+        const idx = resources.findIndex((x) => x.id === r.id);
+        if (idx !== -1) resources.splice(idx, 1);
+        saveResources();
+        closeDetail();
+        refreshAll();
       }
       return;
     }
@@ -499,4 +568,26 @@ function initPanelInteractions() {
       navigate(link.dataset.linkRoute);
     }
   });
+
+  panel.addEventListener('submit', (e) => {
+    if (!e.target.matches('#unit-add-form')) return;
+    e.preventDefault();
+    const resourceEl = panel.querySelector('[data-resource-id]');
+    const r = resources.find((x) => x.id === resourceEl?.dataset.resourceId);
+    const title = document.getElementById('unit-add-title').value.trim();
+    if (!r || !title) return;
+    if (!r.units) r.units = [];
+    r.units.push({ id: unitId(), title, done: false });
+    r.updatedAt = new Date().toISOString().slice(0, 10);
+    saveResources();
+    afterUnitChange();
+  });
+}
+
+function afterUnitChange() {
+  invalidateVisibleResourcesCache();
+  refreshDetailPanel();
+  renderStats();
+  renderCharts();
+  renderView();
 }

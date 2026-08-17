@@ -16,6 +16,36 @@ export function person(id) {
   return people[id] || { id, name: id, initials: '?' };
 }
 
+// Identity icons offered when creating a project (a curated subset of icons.js).
+export const PROJECT_ICONS = ['folder', 'grid', 'target', 'code', 'book', 'flame', 'gift', 'checklist', 'layers', 'monitor', 'sparkle', 'users'];
+
+// Defaults for user-created projects. Seed projects keep their hand-authored
+// summary counts; created projects derive counts/progress from their real
+// tasks array.
+export function newProjectDefaults() {
+  const today = new Date().toISOString().slice(0, 10);
+  return {
+    description: '', icon: 'folder', status: 'Not Started', priority: 'Medium',
+    deadline: null, estimatedCompletion: null, progress: 0,
+    owner: 'am', members: ['am'], color: 'blue',
+    createdAt: today, updatedAt: today, lastActivity: today,
+    tags: [], tasks: [], taskCount: 0, completedTaskCount: 0,
+    attachmentsCount: 0, notesCount: 0, favorite: false, pinned: false, cover: false,
+  };
+}
+
+export function recomputeProjectProgress(p) {
+  const tasks = p.tasks || [];
+  if (!tasks.length) return p;
+  const done = tasks.filter((t) => t.done).length;
+  p.taskCount = tasks.length;
+  p.completedTaskCount = done;
+  p.progress = Math.round((done / tasks.length) * 100);
+  p.updatedAt = new Date().toISOString().slice(0, 10);
+  p.lastActivity = p.updatedAt;
+  return p;
+}
+
 // Status color reuses the app's existing semantic tokens wherever the
 // meaning already fits; only Planning and Archived needed a genuinely new hue.
 export const STATUS_CONFIG = {
@@ -41,7 +71,7 @@ export const PRIORITIES = Object.keys(PRIORITY_CONFIG);
 
 export const PROJECT_COLORS = ['blue', 'violet', 'teal', 'amber', 'rose', 'emerald', 'slate'];
 
-export const projects = [
+export let projects = [
   {
     id: 'p1', title: 'Atlas Dashboard Rebuild',
     description: 'Rebuild the dashboard on a reusable component system — StatCard, SectionCard, and every list item type.',
@@ -170,4 +200,19 @@ export const projects = [
   },
 ];
 
-export const ALL_TAGS = [...new Set(projects.flatMap((p) => p.tags))].sort();
+export function allProjectTags() {
+  return [...new Set(projects.flatMap((p) => p.tags || []))].sort();
+}
+
+// Hydration hook — js/persistence.js replaces the in-memory array contents
+// (in place, so every existing `import { projects }` reference stays valid)
+// with what was loaded from IndexedDB for the active workspace.
+export function setProjects(list) {
+  projects.splice(0, projects.length, ...list);
+}
+
+let idCounter = 1000;
+export function createProjectId() {
+  idCounter += 1;
+  return `p${idCounter}-${Date.now()}`;
+}

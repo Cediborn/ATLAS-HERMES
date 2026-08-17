@@ -4,9 +4,11 @@
 import { icon } from '../icons.js';
 import { createPopover } from '../popover.js';
 import { Badge, emptyState } from '../components.js';
-import { projects, STATUSES, PRIORITIES, ALL_TAGS, person } from './data.js';
+import { saveProjects } from '../persistence.js';
+import { projects, STATUSES, PRIORITIES, allProjectTags, person } from './data.js';
 import { getState, setState, getVisibleProjects, invalidateVisibleProjectsCache, resetFilters, SORT_OPTIONS, formatDate, timeAgo } from './state.js';
 import { ProjectCard, ProjectSkeleton, ProjectEmptyState, ProjectHeader, ProjectProgress } from './components.js';
+import { openProjectDialog } from './dialog.js';
 
 export function renderProjects(container) {
   container.innerHTML = `
@@ -86,6 +88,12 @@ function hasActiveFilters() {
   return Boolean(f.search || f.statusFilter.size || f.priorityFilter.size || f.tagFilter.size || f.favoritesOnly);
 }
 
+function refreshAfterMutation() {
+  invalidateVisibleProjectsCache();
+  renderGrid();
+  updateFilterCount();
+}
+
 // ================= GRID INTERACTIONS (delegated — survives every re-render) =================
 function initGridInteractions(grid) {
   grid.addEventListener('click', (e) => {
@@ -144,8 +152,8 @@ function handleCardAction(menuEl, action) {
   if (action === 'favorite') p.favorite = !p.favorite;
   else if (action === 'pin') p.pinned = !p.pinned;
   else if (action === 'archive') p.status = p.status === 'Archived' ? 'Not Started' : 'Archived';
-  invalidateVisibleProjectsCache();
-  renderGrid();
+  saveProjects();
+  refreshAfterMutation();
 }
 
 // ================= TOOLBAR =================
@@ -157,8 +165,7 @@ function initToolbar() {
   });
 
   document.getElementById('projects-new').addEventListener('click', () => {
-    // No create-project backend exists yet — opens quick-capture instead of a dead button.
-    document.getElementById('search-trigger').click();
+    openProjectDialog('create', null, refreshAfterMutation);
   });
 
   initFilterPopover();
@@ -187,6 +194,7 @@ function initFilterPopover() {
 
   function render() {
     const f = getState();
+    const tags = allProjectTags();
     panel.innerHTML = `
       <div class="menu__label">Status</div>
       ${STATUSES.filter((s) => s !== 'Archived').map((s) => filterCheckbox('status', s, f.statusFilter.has(s))).join('')}
@@ -195,7 +203,7 @@ function initFilterPopover() {
       ${PRIORITIES.map((p) => filterCheckbox('priority', p, f.priorityFilter.has(p))).join('')}
       <div class="menu__divider"></div>
       <div class="menu__label">Tags</div>
-      ${ALL_TAGS.map((t) => filterCheckbox('tag', t, f.tagFilter.has(t))).join('')}
+      ${tags.map((t) => filterCheckbox('tag', t, f.tagFilter.has(t))).join('')}
       <div class="menu__divider"></div>
       ${filterCheckbox('favoritesOnly', '', f.favoritesOnly, 'Favorites only')}
       ${filterCheckbox('showArchived', '', f.showArchived, 'Show archived')}
@@ -283,6 +291,7 @@ function initMorePopover() {
 
 // ================= DETAIL PANEL =================
 let lastFocusedBeforeDetail = null;
+let detailProjectId = null;
 
 function initDetailPanel() {
   const overlay = document.getElementById('project-detail-overlay');
@@ -292,11 +301,14 @@ function initDetailPanel() {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && !overlay.hidden) closeDetail();
   });
+  document.getElementById('project-detail-panel').addEventListener('click', onDetailClick);
+  document.getElementById('project-detail-panel').addEventListener('submit', onTaskSubmit);
 }
 
 function openDetail(projectId) {
   const p = projects.find((pr) => pr.id === projectId);
   if (!p) return;
+  detailProjectId = projectId;
   lastFocusedBeforeDetail = document.activeElement;
   const overlay = document.getElementById('project-detail-overlay');
   const panel = document.getElementById('project-detail-panel');
@@ -312,15 +324,137 @@ function closeDetail() {
   const overlay = document.getElementById('project-detail-overlay');
   overlay.hidden = true;
   document.body.style.overflow = '';
+  detailProjectId = null;
   lastFocusedBeforeDetail?.focus?.();
 }
 
+function refreshDetail() {
+  const panel = document.getElementById('project-detail-panel');
+  const p = projects.find((pr) => pr.id === detailProjectId);
+  if (!p) return;
+  const scrollEl = panel.querySelector('.project-detail-panel__scroll');
+  const scrollTop = scrollEl?.scrollTop || 0;
+  panel.innerHTML = renderDetailContent(p);
+  const closeBtn = panel.querySelector('#detail-close');
+  closeBtn.addEventListener('click', closeDetail);
+  closeBtn.focus();
+  if (scrollEl) scrollEl.scrollTop = scrollTop;
+}
+
+function taskId() {
+  return `tk${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+}
+
+function onDetailClick(e) {
+  const check = e.target.closest('[data-task-toggle]');
+  if (check) {
+    const p = projects.find((pr) => pr.id === detailProjectId);
+    const task = p?.tasks?.find((t) => t.id === check.dataset.taskToggle);
+    if (p && task) {
+      task.done = !task.done;
+      recomputeAndSave(p);
+    }
+    return;
+  }
+
+  const del = e.target.closest('[data-task-delete]');
+  if (del) {
+    const p = projects.find((pr) => pr.id === detailProjectId);
+    if (p && p.tasks) {
+      const idx = p.tasks.findIndex((t) => t.id === del.dataset.taskDelete);
+      if (idx !== -1) p.tasks.splice(idx, 1);
+      recomputeAndSave(p);
+    }
+    return;
+  }
+
+  const edit = e.target.closest('#detail-edit');
+  if (edit) {
+    const p = projects.find((pr) => pr.id === detailProjectId);
+    if (p) openProjectDialog('edit', p, () => { refreshDetail(); refreshAfterMutation(); });
+    return;
+  }
+
+  const remove = e.target.closest('#detail-delete');
+  if (remove) {
+    const p = projects.find((pr) => pr.id === detailProjectId);
+    if (p && window.confirm(`Delete "${p.title}"? This can\u2019t be undone.`)) {
+      const idx = projects.findIndex((x) => x.id === p.id);
+      if (idx !== -1) projects.splice(idx, 1);
+      saveProjects();
+      closeDetail();
+      refreshAfterMutation();
+    }
+  }
+}
+
+function onTaskSubmit(e) {
+  if (!e.target.matches('#task-add-form')) return;
+  e.preventDefault();
+  const p = projects.find((pr) => pr.id === detailProjectId);
+  if (!p) return;
+  const input = document.getElementById('task-add-input');
+  const dueInput = document.getElementById('task-add-due');
+  const title = input.value.trim();
+  if (!title) return;
+  if (!p.tasks) p.tasks = [];
+  p.tasks.push({ id: taskId(), title, done: false, due: dueInput?.value || null, createdAt: new Date().toISOString().slice(0, 10) });
+  input.value = '';
+  if (dueInput) dueInput.value = '';
+  recomputeAndSave(p);
+}
+
+function recomputeAndSave(p) {
+  const done = (p.tasks || []).filter((t) => t.done).length;
+  p.taskCount = (p.tasks || []).length;
+  p.completedTaskCount = done;
+  p.progress = p.taskCount ? Math.round((done / p.taskCount) * 100) : 0;
+  p.updatedAt = new Date().toISOString().slice(0, 10);
+  p.lastActivity = p.updatedAt;
+  saveProjects();
+  invalidateVisibleProjectsCache();
+  refreshDetail();
+  renderGrid();
+}
+
 function renderDetailContent(p) {
+  const tasks = p.tasks || [];
+  const doneTasks = tasks.filter((t) => t.done).length;
+  const tasksBody = tasks.length
+    ? `
+      <div class="project-tasks">
+        ${tasks
+          .map(
+            (t) => `
+          <div class="project-task${t.done ? ' is-done' : ''}">
+            <button type="button" class="project-task__check" data-task-toggle="${t.id}" role="checkbox" aria-checked="${t.done}" aria-label="Toggle ${t.title}">${t.done ? icon('check', { size: 12 }) : ''}</button>
+            <span class="project-task__title">${t.title}</span>
+            <button type="button" class="icon-btn project-task__delete" data-task-delete="${t.id}" aria-label="Delete task">${icon('trash', { size: 14 })}</button>
+          </div>`
+          )
+          .join('')}
+      </div>
+      <form class="project-task-add" id="task-add-form">
+        <input id="task-add-input" type="text" placeholder="Add a task\u2026" aria-label="New task title" />
+        <input id="task-add-due" type="date" aria-label="Task due date" />
+        <button type="submit" class="btn btn--primary btn--sm">${icon('plus', { size: 14 })}<span>Add</span></button>
+      </form>`
+    : `
+      <form class="project-task-add" id="task-add-form">
+        <input id="task-add-input" type="text" placeholder="Add your first task\u2026" aria-label="New task title" />
+        <input id="task-add-due" type="date" aria-label="Task due date" />
+        <button type="submit" class="btn btn--primary btn--sm">${icon('plus', { size: 14 })}<span>Add</span></button>
+      </form>`;
+
   return `
     <button type="button" class="icon-btn project-detail-panel__close" id="detail-close" aria-label="Close panel">${icon('x', { size: 18 })}</button>
     <div class="project-detail-panel__scroll">
       ${ProjectHeader({ project: p })}
-      <p class="project-detail-panel__desc">${p.description}</p>
+      <div class="project-detail-panel__header-actions">
+        <button type="button" class="btn btn--secondary" id="detail-edit">${icon('edit', { size: 15 })}<span>Edit</span></button>
+        <button type="button" class="btn btn--secondary" id="detail-delete">${icon('trash', { size: 15 })}<span>Delete</span></button>
+      </div>
+      <p class="project-detail-panel__desc">${p.description || 'No description yet.'}</p>
 
       ${detailSection(
         'Progress',
@@ -328,12 +462,14 @@ function renderDetailContent(p) {
         <div class="project-detail-panel__progress-row">
           ${ProjectProgress({ percentage: p.progress, variant: 'ring', size: 56 })}
           <div class="project-detail-panel__progress-copy">
-            <div>${p.completedTaskCount} of ${p.taskCount} tasks complete</div>
+            <div>${p.completedTaskCount} of ${p.taskCount} task${p.taskCount === 1 ? '' : 's'} complete</div>
             ${p.estimatedCompletion ? `<div class="project-detail-panel__muted">Est. completion ${formatDate(p.estimatedCompletion)}</div>` : ''}
           </div>
         </div>
         ${ProjectProgress({ percentage: p.progress, variant: 'milestone' })}`
       )}
+
+      ${detailSection('Tasks', tasksBody)}
 
       ${detailSection('Members', `<div class="project-detail-panel__members">${p.members.map((id) => memberRow(id, id === p.owner)).join('')}</div>`)}
 
@@ -392,8 +528,6 @@ function statBlock(value, label) {
 }
 
 function activityFeed(p) {
-  // Synthesized from real fields (status/progress/lastActivity) rather than a
-  // separate invented activity log — this genuinely describes what happened.
   const items = [
     `${p.status === 'Completed' ? 'Marked complete' : `Progress updated to ${p.progress}%`} \u2014 ${timeAgo(p.lastActivity)}`,
     `${p.completedTaskCount} of ${p.taskCount} tasks done`,

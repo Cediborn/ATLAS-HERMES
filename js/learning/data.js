@@ -47,7 +47,7 @@ export const RESOURCE_COLORS = ['blue', 'violet', 'teal', 'amber', 'rose', 'emer
 // Progress is DERIVED from completed units in state.js — never stored
 // separately — so ticking a unit off actually moves the resource.
 
-export const resources = [
+export let resources = [
   {
     id: 'r1', title: 'Deep Work', author: 'Cal Newport',
     description: 'Rules for focused success in a distracted world — deep vs. shallow work, scheduling, and digital minimalism.',
@@ -208,4 +208,15 @@ export const resources = [
 
 export function resourceById(id) {
   return resources.find((r) => r.id === id) || null;
+}
+
+// Hydration hook — see projects/data.js for why this replaces in place.
+export function setResources(list) {
+  resources.splice(0, resources.length, ...list);
+}
+
+let resourceIdCounter = 1000;
+export function createResourceId() {
+  resourceIdCounter += 1;
+  return `r${resourceIdCounter}-${Date.now()}`;
 }

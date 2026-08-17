@@ -64,7 +64,7 @@ export const CODING_TOPICS = Object.keys(TOPIC_CONFIG);
 //   linkedGoals?: [], linkedProjects?: [], linkedHabits?: [] }
 // Progress is DERIVED from step completion in state.js — never stored.
 
-export const codingItems = [
+export let codingItems = [
   {
     id: 'c1', title: 'Two Sum', kind: 'problem', source: 'LeetCode', difficulty: 'Easy',
     languages: ['JavaScript', 'Python'], topics: ['algorithms'], status: 'Solved',
@@ -164,7 +164,7 @@ export const codingItems = [
   },
 ];
 
-export const practiceSessions = [
+export let practiceSessions = [
   { id: 's1', date: daysAgo(0), minutes: 65 },
   { id: 's2', date: daysAgo(1), minutes: 40 },
   { id: 's3', date: daysAgo(2), minutes: 90 },
@@ -175,4 +175,24 @@ export const practiceSessions = [
 
 export function codingItemById(id) {
   return codingItems.find((c) => c.id === id) || null;
+}
+
+// Hydration hooks — see projects/data.js for why these replace in place.
+export function setCodingItems(list) {
+  codingItems.splice(0, codingItems.length, ...list);
+}
+
+export function setPracticeSessions(list) {
+  practiceSessions.splice(0, practiceSessions.length, ...list);
+}
+
+let codingIdCounter = 1000;
+export function createCodingItemId() {
+  codingIdCounter += 1;
+  return `c${codingIdCounter}-${Date.now()}`;
+}
+
+export function createPracticeSessionId() {
+  codingIdCounter += 1;
+  return `s${codingIdCounter}-${Date.now()}`;
 }

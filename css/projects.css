@@ -229,9 +229,60 @@
   background: var(--color-accent-solid);
 }
 
+/* ================= DETAIL PANEL — header actions + real task list ================= */
+.project-detail-panel__header-actions {
+  display: flex;
+  gap: var(--space-8);
+  margin-top: var(--space-16);
+}
+
+.project-tasks { display: flex; flex-direction: column; gap: 2px; margin-bottom: var(--space-12); }
+.project-task {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  padding: var(--space-8);
+  border-radius: var(--radius-sm);
+}
+.project-task:hover { background: var(--color-bg-inset); }
+.project-task.is-done .project-task__title { text-decoration: line-through; color: var(--color-text-tertiary); }
+.project-task__check {
+  width: 18px; height: 18px;
+  border-radius: var(--radius-full);
+  border: 1.5px solid var(--color-border);
+  background: transparent;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--color-text-on-accent);
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.project-task__check.is-done, .project-task.is-done .project-task__check { background: var(--color-accent-solid); border-color: var(--color-accent-solid); }
+.project-task__check:focus-visible { outline: 2px solid var(--color-accent-solid); outline-offset: 2px; }
+.project-task__title { flex: 1; min-width: 0; font-size: var(--text-sm); }
+.project-task__delete { opacity: 0; transition: opacity var(--duration-micro) var(--ease-atlas); }
+.project-task:hover .project-task__delete { opacity: 1; }
+
+.project-task-add { display: flex; gap: var(--space-8); margin-top: var(--space-8); }
+.project-task-add input {
+  flex: 1;
+  height: 36px;
+  padding: 0 var(--space-12);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-inset);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+}
+.project-task-add input:focus-visible { outline: 2px solid var(--color-accent-solid); outline-offset: -1px; }
+
+/* Small button variant used inside panels/forms */
+.btn--sm { height: 32px; padding: 0 var(--space-12); font-size: var(--text-xs); }
+.btn--sm svg { width: 14px; height: 14px; }
+
 @media (max-width: 640px) {
   .projects-toolbar__new span { display: none; }
   .projects-filter-panel { min-width: min(240px, 88vw); }
   .project-detail-panel__scroll { padding: var(--space-24) var(--space-16) var(--space-16); }
   .project-detail-panel__stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .project-task__delete { opacity: 1; }
 }

@@ -5,7 +5,7 @@
 
 import { icon } from '../icons.js';
 import { createPopover } from '../popover.js';
-import { CALENDARS, EVENT_TYPES, calendar } from './data.js';
+import { CALENDARS, EVENT_TYPES, calendar, applyCalendarVisibility, setCalendarVisibility } from './data.js';
 import { getState, setState, invalidateVisibleEventsCache, resetFilters, formatMonthYear, addMonths, todayKey, todayDate, dateKey, monthGridDays } from './state.js';
 import { CalendarSkeleton } from './components.js';
 import { initMiniCalendar, renderMiniCalendar } from './mini-calendar.js';
@@ -17,6 +17,7 @@ import { initEventPanel, openEventPopover, openEventDialog, openDayList } from '
 const PRIORITIES = ['low', 'medium', 'high', 'critical'];
 
 export function renderCalendar(container) {
+  applyCalendarVisibility(getState().workspaceId || 'personal');
   container.innerHTML = `
     <div class="calendar-page">
       <div class="calendar-toolbar">
@@ -196,6 +197,7 @@ function initCalendarsPopover() {
     if (!cb) return;
     const cal = calendar(cb.dataset.calendarId);
     cal.visible = cb.checked;
+    setCalendarVisibility(getState().workspaceId || 'personal', cb.dataset.calendarId, cb.checked);
     syncAfterMutation();
     renderLegend();
   });

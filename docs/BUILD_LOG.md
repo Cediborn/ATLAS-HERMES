@@ -231,3 +231,82 @@ Every JS file syntax-checked as a real ES module (`node --check` via stdin, not 
 - Dashboard, Projects, Notes, Calendar, and now Habits are all real pages backed by live data. Goals, Finance, Books, and Coding are still the honest empty-state placeholders from the very first milestone, each tagged with its roadmap phase where one exists.
 - The dashboard's own habit-completion toggle is a simple binary (done / not done) — the richer 3-state cycle (done/skipped/undo) only exists on the Habits page itself. A deliberate scope difference for a small preview widget, not an inconsistency to fix later without also redesigning `HabitItem`'s markup.
 - Habits' 90-day completion history is generated at page-load time relative to the real current date (see §1.6), not stored — reloading regenerates the same shape (same seeds) but "today" shifts forward with it, so streak numbers will very gradually change build-to-build as real time passes, which is intended, not a bug.
+
+---
+
+### 1.7 — Persistent data layer + full CRUD across every module ("Atlas becomes real")
+
+The milestone that turned Atlas from a beautifully interactive prototype into an application
+whose data actually survives a reload. The requirement: create/edit/delete anything and have
+it persist; refreshing or closing the browser must not reset to mock data; the dashboard must
+show real computed numbers; workspaces must be real data scopes.
+
+**Architecture (the whole point — nothing below the seam changed):**
+
+```
+UI (view.js) → logic (state.js / repository.js, in-memory arrays)
+             → persistence (js/persistence.js) → IndexedDB (js/db.js)
+```
+
+- `js/db.js` — thin promise wrapper over IndexedDB. One database (`atlas-db`), one object
+  store per collection, every record carries a `workspaceId` (so workspaces are data scopes,
+  not a renamed label). Deliberately dependency-free and small so a future backend adapter
+  can replace it without touching a single view.
+- `js/persistence.js` — the seam. Three jobs: (1) first-run seeding from the module
+  `data.js` files, which are now *seed data* rather than the source of truth (tag/calendar
+  names map each seed record to its workspace); (2) hydration of the in-memory arrays from
+  the store for the active workspace, **in place** (`splice`-based setters) so every existing
+  `import { projects }` reference keeps working and no view became async; (3) write-through
+  `save*()` helpers called at every mutation site, queued per store so rapid successive
+  mutations persist in order, failures logged not thrown.
+- Every module's `data.js` gained a `setX(list)` hydration hook.
+- `js/config.js` — the app's static config (workspaces, nav, quick actions) split out of
+  `mock-data.js`, which is now landing-page content only.
+
+**What became real this milestone:**
+
+- **Projects:** a real create/edit/delete dialog (schema-driven, shared `js/form-dialog.js`
+  reusing the habit-dialog shell/classes), real task management in the detail panel
+  (add/toggle/delete tasks with due dates), persistence on every mutation.
+- **Calendar:** create/edit/delete events persist (recurrence already worked — it was pure,
+  now it's persisted). Calendar visibility prefs persist per workspace.
+- **Notes:** save/toggle/delete persist; the editor gained a Delete action.
+- **Habits:** CRUD + completion toggles persist; the flat `completions` array (the persisted
+  representation) and the in-memory `completionIndex` stay in sync; streaks/heatmaps were
+  already computed — now they're computed from *stored* history.
+- **Goals / Learning / Books / Coding / Finance:** all had polished UI with no way to create
+  or edit anything ("New X" opened the command palette). Each got a real dialog (thin
+  wrappers over `form-dialog.js`) plus real sub-item management (milestones, units, coding
+  steps) and persistence. Finance got a proper transaction dialog with validation.
+- **Dashboard:** every number is now computed from live data — tasks due (from real project
+  tasks + deadlines), habit streak (from stored completion history), events today (calendar
+  incl. recurring + habit-reminder adapters), notes this week, top goals, reading progress,
+  coding, finance. No hard-coded values remain.
+- **Command palette:** searches real user content across modules (projects, tasks, notes,
+  events, goals, books, learning) and navigates on selection — same design, real engine.
+- **Notifications:** generated from real data (upcoming events, overdue projects, approaching
+  goal deadlines, unfinished tasks, habits due today) instead of 3 hardcoded rows.
+- **Settings:** profile (name/email) persists via the `meta` store; Reset demo data wipes
+  every store and re-seeds; workspace list is real.
+- **Workspaces:** switching hydrates the active workspace's data from IndexedDB — separate
+  data contexts, not a label change.
+
+**One real bug caught by validation:** the new shared form dialog populated its shell but
+never unhid the overlay (`openFormDialog` was missing the `overlay.hidden = false` that the
+habit dialog's `openOverlay()` had always done) — the dialog rendered invisible. Caught by
+the end-to-end UI driver clicking "New Project" and asserting the overlay was visible.
+
+**Validation (two new harnesses in `tests/`):**
+- `run-tests.js`/`run-tests.html` — a persistence round-trip against the real data layer:
+  seed → mutate (create project with tasks, habit completions, event, note, goal, book,
+  transaction, resource, coding item + session) → flush → "reload" (second Chrome run in
+  the same profile) → verify everything survived → delete → verify deletions stuck →
+  verify workspace scoping. 23/23 checks pass.
+- `ui-driver.mjs` — drives the real app through CDP Input events: navigate to Projects,
+  open the dialog, type a title, submit, confirm the project renders, **reload**, confirm it
+  persisted, find it via the command palette, and see it on the dashboard. 9/9 checks,
+  no page exceptions.
+
+**Remaining known limitations** (unchanged from §9 unless stated): all storage is local to
+the browser — there's still no auth or cloud sync; the cloud path is documented in the
+README and deliberately kept as the `db.js`/`persistence.js` seam.

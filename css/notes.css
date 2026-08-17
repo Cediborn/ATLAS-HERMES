@@ -213,6 +213,7 @@
 }
 .note-editor__title-input::placeholder { color: var(--color-text-tertiary); }
 .note-editor__topbar-actions { display: flex; align-items: center; gap: var(--space-4); flex-shrink: 0; }
+.note-editor__delete:hover { color: var(--color-danger); background: var(--color-danger-wash); }
 .note-editor__category-select {
   height: 36px;
   padding: 0 var(--space-8);

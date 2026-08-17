@@ -4,6 +4,7 @@
 import { icon } from '../icons.js';
 import { createPopover } from '../popover.js';
 import { StatCard, SectionCard, emptyState } from '../components.js';
+import { saveTransactions } from '../persistence.js';
 import {
   accounts,
   transactions,
@@ -36,6 +37,7 @@ import {
   FinanceSkeleton,
   FinanceEmptyState,
 } from './components.js';
+import { openTransactionDialog } from './dialog.js';
 
 export function renderFinance(container) {
   container.innerHTML = `
@@ -235,7 +237,7 @@ function initToolbar() {
   });
 
   document.getElementById('finance-new').addEventListener('click', () => {
-    document.getElementById('search-trigger').click();
+    openTransactionDialog('create', null, refreshAll);
   });
 
   initFilterPopover();
@@ -373,7 +375,14 @@ function initMorePopover() {
   });
 }
 
-// ================= FAVORITE TOGGLE (delegated — survives re-render) =================
+function refreshAll() {
+  invalidateVisibleTransactionsCache();
+  renderStats();
+  renderCharts();
+  renderMain();
+}
+
+// ================= LIST INTERACTIONS (delegated — survives re-render) =================
 function initListInteractions() {
   const main = document.getElementById('finance-main');
   main.addEventListener('click', (e) => {
@@ -384,9 +393,16 @@ function initListInteractions() {
       const tx = transactions.find((t) => t.id === row.dataset.id);
       if (tx) {
         tx.favorite = !tx.favorite;
+        saveTransactions();
         invalidateVisibleTransactionsCache();
         renderMain();
       }
+      return;
+    }
+    const row = e.target.closest('.tx-row');
+    if (row) {
+      const tx = transactions.find((t) => t.id === row.dataset.id);
+      if (tx) openTransactionDialog('edit', tx, refreshAll);
       return;
     }
     const card = e.target.closest('.account-card');
@@ -394,7 +410,11 @@ function initListInteractions() {
   });
   main.addEventListener('keydown', (e) => {
     const t = e.target;
-    if ((e.key === 'Enter' || e.key === ' ') && t.classList.contains('account-card')) {
+    if ((e.key === 'Enter' || e.key === ' ') && t.classList.contains('tx-row')) {
+      e.preventDefault();
+      const tx = transactions.find((x) => x.id === t.dataset.id);
+      if (tx) openTransactionDialog('edit', tx, refreshAll);
+    } else if ((e.key === 'Enter' || e.key === ' ') && t.classList.contains('account-card')) {
       e.preventDefault();
       openAccountDetail(t.dataset.id);
     }
@@ -485,6 +505,7 @@ function initPanelInteractions() {
       const tx = transactions.find((t) => t.id === row.dataset.id);
       if (tx) {
         tx.favorite = !tx.favorite;
+        saveTransactions();
         invalidateVisibleTransactionsCache();
         const scrollEl = panel.querySelector('.account-detail-panel__scroll');
         const scrollTop = scrollEl?.scrollTop || 0;

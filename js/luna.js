@@ -4,8 +4,8 @@
 // DOM and owns all its event listeners.
 
 import { icon } from './icons.js';
-import { todayKey, formatDate } from './date-utils.js';
-import { dashboardData } from './mock-data.js';
+import { todayKey, dateKey, formatDate } from './date-utils.js';
+import { projects as allProjects } from './projects/data.js';
 import { goals as allGoals } from './goals/data.js';
 import { computeGoalProgress } from './goals/state.js';
 import { habits as allHabits } from './habits/data.js';
@@ -28,15 +28,28 @@ let initialized = false;
 
 // ================= INTENT ROUTING =================
 
+// Real task list: open project tasks due today/overdue, plus events today.
 function todayTasks() {
-  const tasks = dashboardData.tasks;
-  if (!tasks.length) return '<p>Nothing on your plate today. Enjoy the clear schedule.</p>';
-  const done = tasks.filter((t) => t.done).length;
-  const todo = tasks.filter((t) => !t.done);
-  const rows = todo.length
-    ? `<ul class="luna-list">${todo.map((t) => `<li>${esc(t.title)} <span class="luna-list__meta">${esc(t.category)} · ${t.priority}</span></li>`).join('')}</ul>`
-    : '<p>Everything is checked off. Nice.</p>';
-  return `<p><strong>${tasks.length} tasks</strong> today — ${done} done.</p>${rows}`;
+  const todayK = todayKey();
+  const rows = [];
+  for (const p of allProjects) {
+    for (const t of p.tasks || []) {
+      if (t.done) continue;
+      const due = t.due || p.deadline || null;
+      if (!due || due > todayK) continue;
+      rows.push(`<li>${esc(t.title)} <span class="luna-list__meta">${esc(p.title)} · ${due < todayK ? 'overdue' : 'due today'}</span></li>`);
+    }
+  }
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setHours(23, 59, 59, 999);
+  const evts = getEventsInRange(start, end).filter((e) => !e.completed).slice(0, 3);
+  for (const e of evts) {
+    rows.push(`<li>${esc(e.title)} <span class="luna-list__meta">${e.allDay ? 'All day' : formatTime(e.start)}</span></li>`);
+  }
+  if (!rows.length) return '<p>Nothing on your plate today. Enjoy the clear schedule.</p>';
+  return `<p><strong>${rows.length} things</strong> due today.</p><ul class="luna-list">${rows.join('')}</ul>`;
 }
 
 function topGoalAnswer() {
@@ -105,7 +118,15 @@ function eventsAnswer() {
 function greetingAnswer() {
   const hour = new Date().getHours();
   const part = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
-  const undone = dashboardData.tasks.filter((t) => !t.done).length;
+  const todayK = todayKey();
+  let undone = 0;
+  for (const p of allProjects) {
+    for (const t of p.tasks || []) {
+      if (t.done) continue;
+      const due = t.due || p.deadline || null;
+      if (due && due <= todayK) undone += 1;
+    }
+  }
   const top = topStreaks('current', 1)[0];
   const goal = allGoals
     .filter((g) => g.status !== 'Completed' && g.status !== 'Archived')

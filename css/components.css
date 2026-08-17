@@ -474,3 +474,56 @@ kbd {
   /* Popover panels must never overflow a phone viewport */
   .menu { max-width: 92vw; }
 }
+
+/* ================= Detail-panel header actions (Projects/Goals/Learning/Books/Coding) ================= */
+.goal-detail-panel__header-actions,
+.project-detail-panel__header-actions,
+.resource-detail-panel__header-actions,
+.book-detail-panel__header-actions,
+.coding-detail-panel__header-actions {
+  display: flex;
+  gap: var(--space-8);
+  margin-top: var(--space-16);
+}
+
+/* ================= Inline sub-item add form (tasks / milestones / units / steps) ================= */
+.subitem-add { display: flex; gap: var(--space-8); margin-top: var(--space-12); }
+.subitem-add input {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  padding: 0 var(--space-12);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-inset);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+}
+.subitem-add input[type='date'] { flex: 0 0 150px; }
+.subitem-add input:focus-visible { outline: 2px solid var(--color-accent-solid); outline-offset: -1px; }
+
+/* ================= Shared sub-item delete (milestones / units / steps) ================= */
+.goal-milestone__delete,
+.resource-unit__delete,
+.coding-step__delete {
+  opacity: 0;
+  transition: opacity var(--duration-micro) var(--ease-atlas);
+}
+.goal-milestone:hover .goal-milestone__delete,
+.resource-unit:hover .resource-unit__delete,
+.coding-step:hover .coding-step__delete { opacity: 1; }
+.goal-milestone__delete:hover,
+.resource-unit__delete:hover,
+.coding-step__delete:hover { color: var(--color-danger); }
+
+@media (max-width: 640px) {
+  .goal-milestone__delete,
+  .resource-unit__delete,
+  .coding-step__delete { opacity: 1; }
+  .subitem-add input[type='date'] { flex-basis: 120px; }
+}
+
+/* ---- Settings additions ---- */
+.settings-row__meta { font-size: var(--text-xs); color: var(--color-text-tertiary); }
+.settings-row__desc { font-size: var(--text-sm); color: var(--color-text-secondary); padding: var(--space-8) 0; }
+.settings-row .btn { flex-shrink: 0; }

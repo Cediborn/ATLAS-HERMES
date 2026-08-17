@@ -8,6 +8,7 @@
 import { events, calendar, createEventId } from './data.js';
 import { projects } from '../projects/data.js';
 import { habits, isDueOn } from '../habits/data.js';
+import { saveEvents } from '../persistence.js';
 
 // ---- Recurrence expansion (pure) — occurrences are computed on demand for
 // whatever range is being rendered, never stored as separate event copies ----
@@ -174,6 +175,7 @@ export function createLocalEvent(data) {
   const now = new Date().toISOString();
   const event = { ...data, id: createEventId(), source: 'local', createdAt: now, updatedAt: now };
   events.push(event);
+  saveEvents();
   return event;
 }
 
@@ -181,10 +183,12 @@ export function updateLocalEvent(id, patch) {
   const event = events.find((e) => e.id === id);
   if (!event) return null;
   Object.assign(event, patch, { updatedAt: new Date().toISOString() });
+  saveEvents();
   return event;
 }
 
 export function deleteLocalEvent(id) {
   const idx = events.findIndex((e) => e.id === id);
   if (idx !== -1) events.splice(idx, 1);
+  saveEvents();
 }

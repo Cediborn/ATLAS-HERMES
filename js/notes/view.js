@@ -4,7 +4,8 @@
 import { icon } from '../icons.js';
 import { createPopover } from '../popover.js';
 import { ActionMenu } from '../components.js';
-import { notes, CATEGORIES, CATEGORY_CONFIG, ALL_NOTE_TAGS, createNoteId } from './data.js';
+import { saveNotes } from '../persistence.js';
+import { notes, CATEGORIES, CATEGORY_CONFIG, allNoteTags, createNoteId } from './data.js';
 import {
   getState,
   setState,
@@ -80,6 +81,15 @@ export function renderNotes(container) {
     onDiscardEmpty: (note) => {
       const idx = notes.findIndex((n) => n.id === note.id);
       if (idx !== -1) notes.splice(idx, 1);
+      saveNotes();
+      invalidateVisibleNotesCache();
+      renderContent();
+      renderSidebar();
+    },
+    onDelete: (note) => {
+      const idx = notes.findIndex((n) => n.id === note.id);
+      if (idx !== -1) notes.splice(idx, 1);
+      saveNotes();
       invalidateVisibleNotesCache();
       renderContent();
       renderSidebar();
@@ -180,6 +190,7 @@ function handleQuickAction(menuEl, action) {
   if (action === 'favorite') n.favorite = !n.favorite;
   else if (action === 'pin') n.pinned = !n.pinned;
   else if (action === 'archive') n.archived = !n.archived;
+  saveNotes();
   invalidateVisibleNotesCache();
   renderContent();
   renderSidebar();
@@ -228,7 +239,7 @@ function renderCategories() {
 
 function renderTags() {
   const active = getState().tagFilter;
-  document.getElementById('notes-sidebar-tags').innerHTML = ALL_NOTE_TAGS.map(
+  document.getElementById('notes-sidebar-tags').innerHTML = allNoteTags().map(
     (t) => `<button type="button" class="tag-chip${active.has(t) ? ' is-active' : ''}" data-tag="${t}">${t}</button>`
   ).join('');
 }
@@ -306,6 +317,7 @@ function createAndOpenNewNote() {
     archived: false,
   };
   notes.unshift(note);
+  saveNotes();
   invalidateVisibleNotesCache();
   openEditor(note);
 }
@@ -336,7 +348,7 @@ function initFilterPopover() {
       ${CATEGORIES.map((c) => filterCheckbox('category', c, f.categoryFilter.has(c))).join('')}
       <div class="menu__divider"></div>
       <div class="menu__label">Tags</div>
-      ${ALL_NOTE_TAGS.map((t) => filterCheckbox('tag', t, f.tagFilter.has(t))).join('')}
+      ${allNoteTags().map((t) => filterCheckbox('tag', t, f.tagFilter.has(t))).join('')}
       <div class="menu__divider"></div>
       ${filterCheckbox('favoritesOnly', '', f.favoritesOnly, 'Favorites only')}
       ${filterCheckbox('pinnedOnly', '', f.pinnedOnly, 'Pinned only')}

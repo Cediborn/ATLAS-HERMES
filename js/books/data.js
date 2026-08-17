@@ -35,7 +35,7 @@ export const BOOK_FORMATS = Object.keys(FORMAT_CONFIG);
 //   notes?, startedAt?, finishedAt?, linkedGoals?: [], linkedHabits?: [] }
 // Progress is DERIVED from pagesRead / pages in state.js — never stored.
 
-export const books = [
+export let books = [
   {
     id: 'b1', title: 'Deep Work', author: 'Cal Newport', genre: 'self-improvement', format: 'print',
     pages: 304, pagesRead: 304, status: 'Finished', rating: 5, favorite: true,
@@ -117,4 +117,15 @@ export const books = [
 
 export function bookById(id) {
   return books.find((b) => b.id === id) || null;
+}
+
+// Hydration hook — see projects/data.js for why this replaces in place.
+export function setBooks(list) {
+  books.splice(0, books.length, ...list);
+}
+
+let bookIdCounter = 1000;
+export function createBookId() {
+  bookIdCounter += 1;
+  return `b${bookIdCounter}-${Date.now()}`;
 }

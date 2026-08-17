@@ -4,7 +4,7 @@
 
 import { icon } from './icons.js';
 import { getState, setState } from './store.js';
-import { workspaces } from './mock-data.js';
+import { workspaces } from './config.js';
 import { createPopover } from './popover.js';
 
 const MOBILE_BREAKPOINT = 768;
@@ -30,7 +30,10 @@ export function setActiveRoute(routeId) {
   });
 }
 
-export function initSidebarControls() {
+let onWorkspaceChangeCb = null;
+
+export function initSidebarControls({ onWorkspaceChange } = {}) {
+  onWorkspaceChangeCb = onWorkspaceChange || null;
   const appShell = document.querySelector('.app-shell');
   const sidebar = document.getElementById('sidebar');
   const backdrop = document.getElementById('sidebar-backdrop');
@@ -116,12 +119,19 @@ function initWorkspaceSwitcher() {
 
   const popover = createPopover({ trigger, panel: menu, onOpenRender: renderMenu });
 
-  menu.addEventListener('click', (e) => {
+  menu.addEventListener('click', async (e) => {
     const btn = e.target.closest('[data-id]');
     if (btn) {
-      setState({ workspaceId: btn.dataset.id });
-      applyActive();
+      const nextId = btn.dataset.id;
+      if (nextId === getState().workspaceId) {
+        popover.close();
+        return;
+      }
       popover.close();
+      // Persistence re-hydrates every in-memory array for the new workspace,
+      // then the router re-renders — real data context switching.
+      await onWorkspaceChangeCb?.(nextId);
+      applyActive();
     }
   });
 

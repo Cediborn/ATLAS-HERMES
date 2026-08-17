@@ -111,7 +111,7 @@ function daysAgo(n) {
   return dateKey(d);
 }
 
-export const habits = [
+export let habits = [
   {
     id: 'h1', title: 'Morning Run', description: '3 miles before the day gets busy.',
     category: 'morning', icon: 'flame', color: 'amber', frequency: 'daily', customDays: null,
@@ -202,7 +202,9 @@ export const habits = [
   },
 ];
 
-export const ALL_TAGS = [...new Set(habits.flatMap((h) => h.tags))].sort();
+export function allHabitTags() {
+  return [...new Set(habits.flatMap((h) => h.tags || []))].sort();
+}
 
 export function habitById(id) {
   return habits.find((h) => h.id === id) || null;
@@ -264,4 +266,19 @@ const HISTORY_PROFILES = {
   h11: { seed: 111, successRate: 0.6, skipRate: 0.1, tailStreakDays: 0 },
 };
 
-export const completions = habits.flatMap((h) => generateHistory(h, HISTORY_PROFILES[h.id]));
+export let completions = habits.flatMap((h) => generateHistory(h, HISTORY_PROFILES[h.id]));
+
+// Hydration hooks — see projects/data.js for why these replace in place.
+export function setHabits(list) {
+  habits.splice(0, habits.length, ...list);
+}
+
+export function setCompletions(list) {
+  completions.splice(0, completions.length, ...list);
+}
+
+let habitIdCounter = 1000;
+export function createHabitId() {
+  habitIdCounter += 1;
+  return `h${habitIdCounter}-${Date.now()}`;
+}

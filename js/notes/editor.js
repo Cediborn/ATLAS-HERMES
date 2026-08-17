@@ -3,6 +3,7 @@
 // own focus trap since it has several focusable controls, not just one input.
 
 import { icon } from '../icons.js';
+import { saveNotes } from '../persistence.js';
 import { CATEGORIES } from './data.js';
 import { wordCount, charCount, readingTime, timeAgo } from './state.js';
 import { renderMarkdown } from './markdown.js';
@@ -14,10 +15,12 @@ let saveTimer = null;
 let initialSnapshot = '';
 let onChangeCb = null;
 let onDiscardEmptyCb = null;
+let onDeleteCb = null;
 
-export function initEditor(root, { onChange, onDiscardEmpty } = {}) {
+export function initEditor(root, { onChange, onDiscardEmpty, onDelete } = {}) {
   onChangeCb = onChange;
   onDiscardEmptyCb = onDiscardEmpty;
+  onDeleteCb = onDelete;
   root.insertAdjacentHTML('beforeend', editorMarkup());
   cacheEls();
   wireEvents();
@@ -37,6 +40,7 @@ function editorMarkup() {
             <button type="button" class="icon-btn" id="editor-pin" aria-label="Pin note" aria-pressed="false">${icon('pin', { size: 17 })}</button>
             <button type="button" class="icon-btn" id="editor-favorite" aria-label="Favorite note" aria-pressed="false">${icon('star', { size: 17 })}</button>
             <button type="button" class="icon-btn" id="editor-archive" aria-label="Archive note" aria-pressed="false">${icon('archive', { size: 17 })}</button>
+            <button type="button" class="icon-btn note-editor__delete" id="editor-delete" aria-label="Delete note">${icon('trash', { size: 17 })}</button>
           </div>
         </header>
 
@@ -73,6 +77,7 @@ function cacheEls() {
     pin: document.getElementById('editor-pin'),
     favorite: document.getElementById('editor-favorite'),
     archive: document.getElementById('editor-archive'),
+    delete: document.getElementById('editor-delete'),
     tabEdit: document.getElementById('editor-tab-edit'),
     tabPreview: document.getElementById('editor-tab-preview'),
     saveStatus: document.getElementById('editor-save-status'),
@@ -106,6 +111,8 @@ function wireEvents() {
   els.category.addEventListener('change', () => {
     if (currentNote) {
       currentNote.category = els.category.value;
+      currentNote.updatedAt = new Date().toISOString().slice(0, 10);
+      saveNotes();
       onChangeCb?.();
     }
   });
@@ -113,6 +120,7 @@ function wireEvents() {
   els.pin.addEventListener('click', () => toggleFlag('pinned', els.pin));
   els.favorite.addEventListener('click', () => toggleFlag('favorite', els.favorite));
   els.archive.addEventListener('click', () => toggleFlag('archived', els.archive));
+  els.delete.addEventListener('click', deleteCurrentNote);
 
   els.tabEdit.addEventListener('click', () => switchTab('edit'));
   els.tabPreview.addEventListener('click', () => switchTab('preview'));
@@ -138,7 +146,21 @@ function toggleFlag(field, buttonEl) {
   currentNote[field] = !currentNote[field];
   buttonEl.setAttribute('aria-pressed', String(currentNote[field]));
   buttonEl.classList.toggle('is-active', currentNote[field]);
+  saveNotes();
   onChangeCb?.();
+}
+
+function deleteCurrentNote() {
+  if (!currentNote) return;
+  const title = currentNote.title.trim() || 'Untitled note';
+  if (!window.confirm(`Delete "${title}"? This can\u2019t be undone.`)) return;
+  const note = currentNote;
+  clearTimeout(saveTimer);
+  els.overlay.hidden = true;
+  document.body.style.overflow = '';
+  currentNote = null;
+  lastFocused?.focus?.();
+  onDeleteCb?.(note);
 }
 
 function switchTab(tab) {
@@ -170,6 +192,7 @@ function commitNow() {
     currentNote.updatedAt = new Date().toISOString().slice(0, 10);
     initialSnapshot = snapshot;
     updateLastEdited();
+    saveNotes();
     onChangeCb?.();
   }
   showStatus('saved');

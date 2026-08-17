@@ -2,7 +2,7 @@
 // on hard refresh under GitHub Pages' static hosting without extra server
 // config; `#/route` resolves entirely client-side, so it just works.
 
-import { navItems } from './mock-data.js';
+import { navItems } from './config.js';
 import { renderDashboard, renderEmptyState, renderSettings } from './views.js';
 import { setActiveRoute } from './sidebar.js';
 import { setPageTitle } from './topbar.js';
@@ -83,6 +83,10 @@ export function navigate(routeId) {
     return;
   }
   window.location.hash = `/${routeId}`;
+}
+
+export function rerender() {
+  render(currentRouteId());
 }
 
 export function initRouter() {

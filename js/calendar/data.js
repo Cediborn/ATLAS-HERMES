@@ -43,6 +43,32 @@ export function calendar(id) {
   return CALENDARS.find((c) => c.id === id) || CALENDARS[0];
 }
 
+// Which calendars are visible is a lightweight per-workspace UI preference,
+// so it lives in localStorage (like theme/sidebar) rather than the data layer.
+export function applyCalendarVisibility(workspaceId) {
+  try {
+    const raw = localStorage.getItem(`atlas:calVis:${workspaceId}`);
+    if (!raw) return;
+    const hidden = JSON.parse(raw);
+    for (const c of CALENDARS) c.visible = !hidden.includes(c.id);
+  } catch {
+    // malformed pref — fall back to all visible
+  }
+}
+
+export function setCalendarVisibility(workspaceId, calendarId, visible) {
+  try {
+    const raw = localStorage.getItem(`atlas:calVis:${workspaceId}`);
+    const hidden = raw ? JSON.parse(raw) : [];
+    const set = new Set(hidden);
+    if (visible) set.delete(calendarId);
+    else set.add(calendarId);
+    localStorage.setItem(`atlas:calVis:${workspaceId}`, JSON.stringify([...set]));
+  } catch {
+    // storage unavailable — visibility just won't be remembered
+  }
+}
+
 export const EVENT_TYPE_CONFIG = {
   'Normal Event': { icon: 'calendar' },
   Meeting: { icon: 'users' },
@@ -64,7 +90,7 @@ const base = {
   googleEventId: null, source: 'local',
 };
 
-export const events = [
+export let events = [
   { ...base, id: 'e1', title: 'Team sync', type: 'Meeting', calendarId: 'work',
     start: '2026-07-27T14:00', end: '2026-07-27T14:30', allDay: false,
     recurring: true, recurrenceRule: 'weekly',
@@ -158,7 +184,12 @@ export const events = [
     createdAt: '2026-01-10', updatedAt: '2026-02-20' },
 ];
 
-let idCounter = events.length;
+// Hydration hook — see projects/data.js for why this replaces in place.
+export function setEvents(list) {
+  events.splice(0, events.length, ...list);
+}
+
+let idCounter = 1000;
 export function createEventId() {
   idCounter += 1;
   return `e${idCounter}-${Date.now()}`;

@@ -60,7 +60,7 @@ export const EXPENSE_CATEGORIES = TRANSACTION_CATEGORIES.filter((c) => CATEGORY_
 // ---- Transactions ----
 // { id, date, description, type: 'income'|'expense', category, amount, accountId, status: 'cleared'|'pending', favorite }
 // `amount` is always positive; `type` decides the sign in balance math.
-export const transactions = [
+export let transactions = [
   // Income
   { id: 't1', date: daysAgo(2), description: 'Salary — August', type: 'income', category: 'salary', amount: 5200, accountId: 'a1', status: 'cleared', favorite: true },
   { id: 't2', date: daysAgo(30), description: 'Salary — July', type: 'income', category: 'salary', amount: 5200, accountId: 'a1', status: 'cleared', favorite: false },
@@ -91,4 +91,15 @@ export const transactions = [
 
 export function accountById(id) {
   return accounts.find((a) => a.id === id) || null;
+}
+
+// Hydration hook — see projects/data.js for why this replaces in place.
+export function setTransactions(list) {
+  transactions.splice(0, transactions.length, ...list);
+}
+
+let txIdCounter = 1000;
+export function createTransactionId() {
+  txIdCounter += 1;
+  return `t${txIdCounter}-${Date.now()}`;
 }

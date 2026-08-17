@@ -5,8 +5,12 @@ import { icon } from '../icons.js';
 import { createPopover } from '../popover.js';
 import { StatCard, SectionCard, emptyState } from '../components.js';
 import { navigate } from '../router.js';
+import { saveCodingItems, saveCodingSessions } from '../persistence.js';
+import { dateKey } from '../date-utils.js';
 import {
   codingItems,
+  practiceSessions,
+  createPracticeSessionId,
   CODING_STATUSES,
   DIFFICULTIES,
   CODING_LANGUAGES,
@@ -35,6 +39,7 @@ import {
   CodingSkeleton,
   CodingEmptyState,
 } from './components.js';
+import { openCodingDialog } from './dialog.js';
 import { goals } from '../goals/data.js';
 import { projects } from '../projects/data.js';
 import { habits } from '../habits/data.js';
@@ -213,7 +218,7 @@ function initToolbar() {
   });
 
   document.getElementById('coding-new').addEventListener('click', () => {
-    document.getElementById('search-trigger').click();
+    openCodingDialog('create', null, refreshAll);
   });
 
   initFilterPopover();
@@ -377,7 +382,15 @@ function refreshDetailPanel() {
   const scrollTop = scrollEl?.scrollTop || 0;
   panel.innerHTML = renderDetailContent(item);
   panel.querySelector('#coding-detail-close').addEventListener('click', closeDetail);
+  panel.querySelector('#coding-detail-close').focus();
   if (scrollEl) scrollEl.scrollTop = scrollTop;
+}
+
+function refreshAll() {
+  invalidateVisibleCache();
+  renderStats();
+  renderCharts();
+  renderView();
 }
 
 function renderDetailContent(item) {
@@ -391,6 +404,11 @@ function renderDetailContent(item) {
     <button type="button" class="icon-btn coding-detail-panel__close" id="coding-detail-close" aria-label="Close panel">${icon('x', { size: 18 })}</button>
     <div class="coding-detail-panel__scroll" data-coding-id="${item.id}">
       ${CodingHeader({ item })}
+      <div class="coding-detail-panel__header-actions">
+        <button type="button" class="btn btn--secondary" id="coding-detail-edit">${icon('edit', { size: 15 })}<span>Edit</span></button>
+        <button type="button" class="btn btn--secondary" id="coding-detail-log">${icon('plus', { size: 15 })}<span>Log session</span></button>
+        <button type="button" class="btn btn--secondary" id="coding-detail-delete">${icon('trash', { size: 15 })}<span>Delete</span></button>
+      </div>
       ${item.notes ? `<p class="coding-detail-panel__desc">${item.notes}</p>` : ''}
 
       ${detailSection('Progress', `
@@ -401,16 +419,7 @@ function renderDetailContent(item) {
             <div class="coding-detail-panel__muted">${item.status === 'In Progress' ? 'Keep going' : item.status}</div>
           </div>
         </div>
-        ${item.steps && item.steps.length
-          ? `
-          <div class="coding-steps" id="coding-steps">
-            ${item.steps.map((s) => `
-              <button type="button" class="coding-step${s.done ? ' is-done' : ''}" data-step-id="${s.id}">
-                <span class="coding-step__check">${s.done ? icon('check', { size: 12 }) : ''}</span>
-                <span class="coding-step__title">${s.title}</span>
-              </button>`).join('')}
-          </div>`
-          : ''}
+        ${stepsSection(item)}
       `)}
 
       ${detailSection('Details', `
@@ -466,28 +475,102 @@ function statBlock(value, label) {
   return `<div class="coding-detail-panel__stat"><span class="coding-detail-panel__stat-value">${value}</span><span class="coding-detail-panel__stat-label">${label}</span></div>`;
 }
 
-// Panel event delegation — step checklist + link navigation.
+function stepId() {
+  return `cs${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+}
+
+function stepsSection(item) {
+  const list = item.steps || [];
+  const rows = list.length
+    ? `<div class="coding-steps" id="coding-steps">${list
+        .map(
+          (s) => `
+          <div class="coding-step${s.done ? ' is-done' : ''}" data-step-id="${s.id}">
+            <button type="button" class="coding-step__check" data-step-toggle="${s.id}" role="checkbox" aria-checked="${s.done}" aria-label="${s.done ? 'Mark incomplete' : 'Mark complete'}: ${s.title}">${s.done ? icon('check', { size: 12 }) : ''}</button>
+            <span class="coding-step__title">${s.title}</span>
+            <button type="button" class="icon-btn coding-step__delete" data-step-delete="${s.id}" aria-label="Delete step">${icon('trash', { size: 13 })}</button>
+          </div>`
+        )
+        .join('')}</div>`
+    : emptyState({ icon: 'checklist', title: 'No steps yet', description: 'Break this item into checkable steps.', size: 'sm' });
+  return `
+    <div class="coding-steps-wrap">
+      ${rows}
+      <form class="subitem-add" id="step-add-form">
+        <input id="step-add-title" type="text" placeholder="New step\u2026" aria-label="Step title" />
+        <button type="submit" class="btn btn--primary btn--sm">${icon('plus', { size: 14 })}<span>Add</span></button>
+      </form>
+    </div>`;
+}
+
+function logSession(item) {
+  const minutes = window.prompt(`Minutes spent on "${item.title}"?`, '30');
+  if (minutes === null) return;
+  const mins = Number(minutes);
+  if (!Number.isFinite(mins) || mins <= 0) {
+    window.alert('Enter a positive number of minutes.');
+    return;
+  }
+  const today = dateKey(new Date());
+  practiceSessions.push({ id: createPracticeSessionId(), date: today, minutes: Math.round(mins) });
+  item.timeSpentMin = (item.timeSpentMin || 0) + Math.round(mins);
+  item.lastPracticed = today;
+  saveCodingSessions();
+  saveCodingItems();
+  afterItemChange();
+}
+
+// Panel event delegation — step checklist, edit/delete, session logging, links.
 function initPanelInteractions() {
   const panel = document.getElementById('coding-detail-panel');
   if (panel.dataset.interactions) return;
   panel.dataset.interactions = '1';
 
   panel.addEventListener('click', (e) => {
-    const stepBtn = e.target.closest('[data-step-id]');
-    if (stepBtn) {
-      const itemEl = panel.querySelector('[data-coding-id]');
-      const item = codingItems.find((x) => x.id === itemEl?.dataset.codingId);
-      if (item) {
-        const step = (item.steps || []).find((s) => s.id === stepBtn.dataset.stepId);
-        if (step) {
-          step.done = !step.done;
-          item.lastPracticed = new Date().toISOString().slice(0, 10);
-        }
-        invalidateVisibleCache();
-        refreshDetailPanel();
-        renderView();
-        renderStats();
-        renderCharts();
+    const itemEl = panel.querySelector('[data-coding-id]');
+    const item = codingItems.find((x) => x.id === itemEl?.dataset.codingId);
+
+    const stepBtn = e.target.closest('[data-step-toggle]');
+    if (stepBtn && item) {
+      const step = (item.steps || []).find((s) => s.id === stepBtn.dataset.stepToggle);
+      if (step) {
+        step.done = !step.done;
+        item.lastPracticed = new Date().toISOString().slice(0, 10);
+      }
+      saveCodingItems();
+      afterItemChange();
+      return;
+    }
+
+    const del = e.target.closest('[data-step-delete]');
+    if (del && item && item.steps) {
+      const idx = item.steps.findIndex((s) => s.id === del.dataset.stepDelete);
+      if (idx !== -1) item.steps.splice(idx, 1);
+      saveCodingItems();
+      afterItemChange();
+      return;
+    }
+
+    const edit = e.target.closest('#coding-detail-edit');
+    if (edit && item) {
+      openCodingDialog('edit', codingItems.find((x) => x.id === item.id), () => { refreshDetailPanel(); refreshAll(); });
+      return;
+    }
+
+    const log = e.target.closest('#coding-detail-log');
+    if (log && item) {
+      logSession(codingItems.find((x) => x.id === item.id));
+      return;
+    }
+
+    const remove = e.target.closest('#coding-detail-delete');
+    if (remove && item) {
+      if (window.confirm(`Delete "${item.title}"? This can\u2019t be undone.`)) {
+        const idx = codingItems.findIndex((x) => x.id === item.id);
+        if (idx !== -1) codingItems.splice(idx, 1);
+        saveCodingItems();
+        closeDetail();
+        refreshAll();
       }
       return;
     }
@@ -498,4 +581,26 @@ function initPanelInteractions() {
       navigate(link.dataset.linkRoute);
     }
   });
+
+  panel.addEventListener('submit', (e) => {
+    if (!e.target.matches('#step-add-form')) return;
+    e.preventDefault();
+    const itemEl = panel.querySelector('[data-coding-id]');
+    const item = codingItems.find((x) => x.id === itemEl?.dataset.codingId);
+    const title = document.getElementById('step-add-title').value.trim();
+    if (!item || !title) return;
+    if (!item.steps) item.steps = [];
+    item.steps.push({ id: stepId(), title, done: false });
+    item.lastPracticed = new Date().toISOString().slice(0, 10);
+    saveCodingItems();
+    afterItemChange();
+  });
+}
+
+function afterItemChange() {
+  invalidateVisibleCache();
+  refreshDetailPanel();
+  renderStats();
+  renderCharts();
+  renderView();
 }

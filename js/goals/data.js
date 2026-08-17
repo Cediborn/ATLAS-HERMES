@@ -49,7 +49,7 @@ export const GOAL_COLORS = ['blue', 'violet', 'teal', 'amber', 'rose', 'emerald'
 // Progress is DERIVED from milestone completion in state.js — never stored
 // separately — so ticking a milestone off actually moves the goal.
 
-export const goals = [
+export let goals = [
   {
     id: 'g1', title: 'Ship Atlas v1.0',
     description: 'The full Atlas system — every module wired together and polished — shipping as a single calm, keyboard-first app.',
@@ -210,4 +210,15 @@ export const goals = [
 
 export function goalById(id) {
   return goals.find((g) => g.id === id) || null;
+}
+
+// Hydration hook — see projects/data.js for why this replaces in place.
+export function setGoals(list) {
+  goals.splice(0, goals.length, ...list);
+}
+
+let goalIdCounter = 1000;
+export function createGoalId() {
+  goalIdCounter += 1;
+  return `g${goalIdCounter}-${Date.now()}`;
 }

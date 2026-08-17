@@ -12,7 +12,7 @@ export const CATEGORY_CONFIG = {
 };
 export const CATEGORIES = Object.keys(CATEGORY_CONFIG);
 
-export const notes = [
+export let notes = [
   {
     id: 'n1', title: 'Distributed Systems \u2014 Consensus Protocols', category: 'Lecture Notes',
     tags: ['University', 'Research'], createdAt: '2026-03-05', updatedAt: '2026-07-24',
@@ -117,9 +117,16 @@ export const notes = [
   },
 ];
 
-export const ALL_NOTE_TAGS = [...new Set(notes.flatMap((n) => n.tags))].sort();
+export function allNoteTags() {
+  return [...new Set(notes.flatMap((n) => n.tags || []))].sort();
+}
 
-let idCounter = notes.length;
+// Hydration hook — see projects/data.js for why this replaces in place.
+export function setNotes(list) {
+  notes.splice(0, notes.length, ...list);
+}
+
+let idCounter = 1000;
 export function createNoteId() {
   idCounter += 1;
   return `n${idCounter}-${Date.now()}`;

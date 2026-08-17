@@ -5,6 +5,7 @@ import { icon } from '../icons.js';
 import { createPopover } from '../popover.js';
 import { StatCard, SectionCard, Badge, emptyState } from '../components.js';
 import { navigate } from '../router.js';
+import { saveGoals } from '../persistence.js';
 import { goals, GOAL_TYPES, GOAL_STATUSES, GOAL_CATEGORIES, CATEGORY_CONFIG, GOAL_STATUS_CONFIG } from './data.js';
 import {
   getState,
@@ -28,12 +29,12 @@ import {
   GoalTimelineItem,
   GoalHeader,
   GoalProgress,
-  MilestoneChecklist,
   GoalForecast,
   GoalSkeleton,
   GoalEmptyState,
   GoalCategory,
 } from './components.js';
+import { openGoalDialog } from './dialog.js';
 import { projects } from '../projects/data.js';
 import { habits } from '../habits/data.js';
 
@@ -230,8 +231,7 @@ function initToolbar() {
   });
 
   document.getElementById('goals-new').addEventListener('click', () => {
-    // No create-goal backend yet — opens quick-capture instead of a dead button.
-    document.getElementById('search-trigger').click();
+    openGoalDialog('create', null, refreshAll);
   });
 
   initFilterPopover();
@@ -404,7 +404,15 @@ function refreshDetailPanel() {
   const scrollTop = scrollEl?.scrollTop || 0;
   panel.innerHTML = renderDetailContent(g);
   panel.querySelector('#goal-detail-close').addEventListener('click', closeDetail);
+  panel.querySelector('#goal-detail-close').focus();
   if (scrollEl) scrollEl.scrollTop = scrollTop;
+}
+
+function refreshAll() {
+  invalidateVisibleGoalsCache();
+  renderStats();
+  renderCharts();
+  renderView();
 }
 
 function renderDetailContent(g) {
@@ -417,6 +425,10 @@ function renderDetailContent(g) {
     <button type="button" class="icon-btn goal-detail-panel__close" id="goal-detail-close" aria-label="Close panel">${icon('x', { size: 18 })}</button>
     <div class="goal-detail-panel__scroll" data-goal-id="${g.id}">
       ${GoalHeader({ goal: g })}
+      <div class="goal-detail-panel__header-actions">
+        <button type="button" class="btn btn--secondary" id="goal-detail-edit">${icon('edit', { size: 15 })}<span>Edit</span></button>
+        <button type="button" class="btn btn--secondary" id="goal-detail-delete">${icon('trash', { size: 15 })}<span>Delete</span></button>
+      </div>
       <p class="goal-detail-panel__desc">${g.description}</p>
 
       ${detailSection('Progress', `
@@ -431,7 +443,7 @@ function renderDetailContent(g) {
 
       ${detailSection('Completion forecast', GoalForecast({ forecast: g.forecast }))}
 
-      ${detailSection('Milestones', MilestoneChecklist({ goal: g }))}
+      ${detailSection('Milestones', milestonesSection(g))}
 
       ${detailSection('Links', `
         ${linkedProjects.length || linkedHabits.length
@@ -482,26 +494,93 @@ function statBlock(value, label) {
   return `<div class="goal-detail-panel__stat"><span class="goal-detail-panel__stat-value">${value}</span><span class="goal-detail-panel__stat-label">${label}</span></div>`;
 }
 
-// Panel event delegation — milestone toggles + link navigation.
+function milestoneId() {
+  return `gm${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+}
+
+function milestonesSection(g) {
+  const list = g.milestones || [];
+  const done = list.filter((m) => m.done).length;
+  const rows = list.length
+    ? `<div class="goal-milestones__list">${list
+        .map(
+          (m) => `
+        <div class="goal-milestone${m.done ? ' is-done' : ''}" data-milestone-id="${m.id}">
+          <button type="button" class="goal-milestone__check" role="checkbox" aria-checked="${m.done}" aria-label="${m.done ? 'Mark incomplete' : 'Mark complete'}: ${m.title}">${icon('check', { size: 11 })}</button>
+          <span class="goal-milestone__body">
+            <span class="goal-milestone__title">${m.title}</span>
+            <span class="goal-milestone__meta">${m.due ? GoalDeadlineLabel(m.due) : ''}</span>
+          </span>
+          <button type="button" class="icon-btn goal-milestone__delete" data-milestone-delete="${m.id}" aria-label="Delete milestone">${icon('trash', { size: 13 })}</button>
+        </div>`
+        )
+        .join('')}</div>`
+    : emptyState({ icon: 'flag', title: 'No milestones yet', description: 'Break this goal into checkable steps.', size: 'sm' });
+  return `
+    <div class="goal-milestones">
+      <div class="goal-milestones__summary">${done} of ${list.length} milestone${list.length === 1 ? '' : 's'} complete</div>
+      ${rows}
+      <form class="subitem-add" id="milestone-add-form">
+        <input id="milestone-add-title" type="text" placeholder="New milestone\u2026" aria-label="Milestone title" />
+        <input id="milestone-add-due" type="date" aria-label="Milestone due date" />
+        <button type="submit" class="btn btn--primary btn--sm">${icon('plus', { size: 14 })}<span>Add</span></button>
+      </form>
+    </div>`;
+}
+
+function GoalDeadlineLabel(due) {
+  const days = daysUntil(due);
+  const urgency = days < 0 ? 'overdue' : days <= 3 ? 'soon' : 'normal';
+  const relative = days < 0 ? `${Math.abs(days)}d overdue` : days === 0 ? 'Due today' : days === 1 ? 'Due tomorrow' : `${days}d left`;
+  return `<span class="goal-deadline goal-deadline--${urgency}" title="${formatDate(due)}">${icon('calendar', { size: 13 })}<span>${relative}</span></span>`;
+}
+
+// Panel event delegation — milestone toggles/add/delete, edit/delete, links.
 function initPanelInteractions() {
   const panel = document.getElementById('goal-detail-panel');
   if (panel.dataset.interactions) return;
   panel.dataset.interactions = '1';
 
   panel.addEventListener('click', (e) => {
+    const goalEl = panel.querySelector('[data-goal-id]');
+    const g = goals.find((x) => x.id === goalEl?.dataset.goalId);
+
     const check = e.target.closest('.goal-milestone__check');
-    if (check) {
-      const row = check.closest('.goal-milestone');
-      const goalEl = panel.querySelector('[data-goal-id]');
-      const g = goals.find((x) => x.id === goalEl?.dataset.goalId);
-      const m = g?.milestones?.find((x) => x.id === row.dataset.milestoneId);
-      if (g && m) {
+    if (check && g) {
+      const m = g.milestones?.find((x) => x.id === check.closest('.goal-milestone').dataset.milestoneId);
+      if (m) {
         m.done = !m.done;
-        invalidateVisibleGoalsCache();
-        refreshDetailPanel();
-        renderView();
-        renderStats();
-        renderCharts();
+        g.updatedAt = new Date().toISOString().slice(0, 10);
+        saveGoals();
+        afterMilestoneChange();
+      }
+      return;
+    }
+
+    const del = e.target.closest('[data-milestone-delete]');
+    if (del && g && g.milestones) {
+      const idx = g.milestones.findIndex((m) => m.id === del.dataset.milestoneDelete);
+      if (idx !== -1) g.milestones.splice(idx, 1);
+      g.updatedAt = new Date().toISOString().slice(0, 10);
+      saveGoals();
+      afterMilestoneChange();
+      return;
+    }
+
+    const edit = e.target.closest('#goal-detail-edit');
+    if (edit && g) {
+      openGoalDialog('edit', g, () => { refreshDetailPanel(); refreshAll(); });
+      return;
+    }
+
+    const remove = e.target.closest('#goal-detail-delete');
+    if (remove && g) {
+      if (window.confirm(`Delete "${g.title}"? This can\u2019t be undone.`)) {
+        const idx = goals.findIndex((x) => x.id === g.id);
+        if (idx !== -1) goals.splice(idx, 1);
+        saveGoals();
+        closeDetail();
+        refreshAll();
       }
       return;
     }
@@ -512,4 +591,26 @@ function initPanelInteractions() {
       navigate(link.dataset.linkRoute);
     }
   });
+
+  panel.addEventListener('submit', (e) => {
+    if (!e.target.matches('#milestone-add-form')) return;
+    e.preventDefault();
+    const goalEl = panel.querySelector('[data-goal-id]');
+    const g = goals.find((x) => x.id === goalEl?.dataset.goalId);
+    const title = document.getElementById('milestone-add-title').value.trim();
+    if (!g || !title) return;
+    if (!g.milestones) g.milestones = [];
+    g.milestones.push({ id: milestoneId(), title, due: document.getElementById('milestone-add-due').value || null, done: false });
+    g.updatedAt = new Date().toISOString().slice(0, 10);
+    saveGoals();
+    afterMilestoneChange();
+  });
+}
+
+function afterMilestoneChange() {
+  invalidateVisibleGoalsCache();
+  refreshDetailPanel();
+  renderStats();
+  renderCharts();
+  renderView();
 }

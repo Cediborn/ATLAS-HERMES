@@ -5,6 +5,7 @@ import { icon } from '../icons.js';
 import { createPopover } from '../popover.js';
 import { StatCard, SectionCard, Badge, emptyState } from '../components.js';
 import { navigate } from '../router.js';
+import { saveBooks } from '../persistence.js';
 import { books, BOOK_GENRES, BOOK_STATUSES, GENRE_CONFIG, BOOK_STATUS_CONFIG } from './data.js';
 import {
   getState,
@@ -26,12 +27,11 @@ import {
   BookRow,
   BookHeader,
   BookProgress,
-  BookStatusBadge,
-  BookRating,
   BookSkeleton,
   BookEmptyState,
   BookGenre,
 } from './components.js';
+import { openBookDialog } from './dialog.js';
 import { goals } from '../goals/data.js';
 import { habits } from '../habits/data.js';
 
@@ -208,7 +208,7 @@ function initToolbar() {
   });
 
   document.getElementById('books-new').addEventListener('click', () => {
-    document.getElementById('search-trigger').click();
+    openBookDialog('create', null, refreshAll);
   });
 
   initFilterPopover();
@@ -368,7 +368,15 @@ function refreshDetailPanel() {
   const scrollTop = scrollEl?.scrollTop || 0;
   panel.innerHTML = renderDetailContent(b);
   panel.querySelector('#book-detail-close').addEventListener('click', closeDetail);
+  panel.querySelector('#book-detail-close').focus();
   if (scrollEl) scrollEl.scrollTop = scrollTop;
+}
+
+function refreshAll() {
+  invalidateVisibleBooksCache();
+  renderStats();
+  renderCharts();
+  renderView();
 }
 
 function renderDetailContent(b) {
@@ -381,6 +389,10 @@ function renderDetailContent(b) {
     <button type="button" class="icon-btn book-detail-panel__close" id="book-detail-close" aria-label="Close panel">${icon('x', { size: 18 })}</button>
     <div class="book-detail-panel__scroll" data-book-id="${b.id}">
       ${BookHeader({ book: b })}
+      <div class="book-detail-panel__header-actions">
+        <button type="button" class="btn btn--secondary" id="book-detail-edit">${icon('edit', { size: 15 })}<span>Edit</span></button>
+        <button type="button" class="btn btn--secondary" id="book-detail-delete">${icon('trash', { size: 15 })}<span>Delete</span></button>
+      </div>
       ${b.notes ? `<p class="book-detail-panel__desc">${b.notes}</p>` : ''}
 
       ${detailSection('Reading progress', `
@@ -450,29 +462,47 @@ function statBlock(value, label) {
   return `<div class="book-detail-panel__stat"><span class="book-detail-panel__stat-value">${value}</span><span class="book-detail-panel__stat-label">${label}</span></div>`;
 }
 
-// Panel event delegation — pages stepper + link navigation.
+// Panel event delegation — pages stepper, edit/delete, link navigation.
 function initPanelInteractions() {
   const panel = document.getElementById('book-detail-panel');
   if (panel.dataset.interactions) return;
   panel.dataset.interactions = '1';
 
   panel.addEventListener('click', (e) => {
+    const bookEl = panel.querySelector('[data-book-id]');
+    const b = books.find((x) => x.id === bookEl?.dataset.bookId);
+
     const stepBtn = e.target.closest('[data-page-step]');
-    if (stepBtn) {
-      const bookEl = panel.querySelector('[data-book-id]');
-      const b = books.find((x) => x.id === bookEl?.dataset.bookId);
-      if (b) {
-        const step = Number(stepBtn.dataset.pageStep);
-        b.pagesRead = Math.max(0, Math.min(b.pages, (b.pagesRead || 0) + step));
-        if (!b.startedAt && b.pagesRead > 0 && b.status === 'Want to Read') {
-          b.startedAt = new Date().toISOString().slice(0, 10);
-          b.status = 'Reading';
-        }
-        invalidateVisibleBooksCache();
-        refreshDetailPanel();
-        renderView();
-        renderStats();
-        renderCharts();
+    if (stepBtn && b) {
+      const step = Number(stepBtn.dataset.pageStep);
+      b.pagesRead = Math.max(0, Math.min(b.pages, (b.pagesRead || 0) + step));
+      if (!b.startedAt && b.pagesRead > 0 && b.status === 'Want to Read') {
+        b.startedAt = new Date().toISOString().slice(0, 10);
+        b.status = 'Reading';
+      }
+      if (b.pages && b.pagesRead >= b.pages && b.status === 'Reading') {
+        b.status = 'Finished';
+        b.finishedAt = b.finishedAt || new Date().toISOString().slice(0, 10);
+      }
+      saveBooks();
+      afterBookChange();
+      return;
+    }
+
+    const edit = e.target.closest('#book-detail-edit');
+    if (edit && b) {
+      openBookDialog('edit', books.find((x) => x.id === b.id), () => { refreshDetailPanel(); refreshAll(); });
+      return;
+    }
+
+    const remove = e.target.closest('#book-detail-delete');
+    if (remove && b) {
+      if (window.confirm(`Delete "${b.title}"? This can\u2019t be undone.`)) {
+        const idx = books.findIndex((x) => x.id === b.id);
+        if (idx !== -1) books.splice(idx, 1);
+        saveBooks();
+        closeDetail();
+        refreshAll();
       }
       return;
     }
@@ -483,4 +513,12 @@ function initPanelInteractions() {
       navigate(link.dataset.linkRoute);
     }
   });
+}
+
+function afterBookChange() {
+  invalidateVisibleBooksCache();
+  refreshDetailPanel();
+  renderStats();
+  renderCharts();
+  renderView();
 }

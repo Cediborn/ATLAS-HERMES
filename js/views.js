@@ -1,12 +1,13 @@
 // Atlas — View renderers. Each export fills a container with markup.
-// The dashboard is now assembled entirely from js/components.js — no
-// section here has its own bespoke wrapper (Day 6 spec).
+// The dashboard is assembled entirely from js/components.js, and every number
+// is computed from the live data layer — no hard-coded values.
 
 import { icon } from './icons.js';
-import { dashboardData, currentUser, workspaces, quickActions } from './mock-data.js';
+import { quickActions, workspaces } from './config.js';
 import { getState } from './store.js';
 import { setTheme } from './theme.js';
-import { timeAgo, todayKey, formatDate } from './date-utils.js';
+import { getProfile, saveProfile, saveProjects } from './persistence.js';
+import { timeAgo, todayKey, formatDate, dateKey } from './date-utils.js';
 import { projects as allProjects } from './projects/data.js';
 import { notes as allNotes } from './notes/data.js';
 import { habits as allHabits } from './habits/data.js';
@@ -43,19 +44,79 @@ import {
   emptyState,
 } from './components.js';
 
+// ---- Real dashboard metrics (computed, never stored/hard-coded) ----
+
+function dueTasksToday() {
+  const today = todayKey();
+  const rows = [];
+  for (const p of allProjects) {
+    for (const t of p.tasks || []) {
+      if (t.done) continue;
+      const due = t.due || p.deadline || null;
+      if (!due) continue;
+      if (due <= today) rows.push({ task: t, project: p, overdue: due < today });
+    }
+  }
+  return rows;
+}
+
+function eventsToday() {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setHours(23, 59, 59, 999);
+  return getEventsInRange(start, end);
+}
+
+function notesThisWeek() {
+  const weekAgo = new Date();
+  weekAgo.setDate(weekAgo.getDate() - 7);
+  const cutoff = dateKey(weekAgo);
+  return allNotes.filter((n) => !n.archived && n.updatedAt >= cutoff);
+}
+
 export function renderDashboard(container) {
-  const d = dashboardData;
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
-  const firstName = currentUser.name.split(' ')[0];
+  const profile = getProfile();
+  const firstName = profile.name.split(' ')[0];
   const dateStr = new Intl.DateTimeFormat('en-US', {
     weekday: 'long',
     month: 'long',
     day: 'numeric',
   }).format(new Date());
 
-  const todayBody = d.tasks.length
-    ? d.tasks.map((t) => TaskItem(t)).join('')
+  // ---- Stats: all real ----
+  const todayDue = dueTasksToday();
+  const evtsToday = eventsToday();
+  const notesWeek = notesThisWeek();
+  const habitStats = computeDashboardStats();
+  const bestStreakHabit = topStreaks('current', 1)[0];
+  const streakTrend = bestStreakHabit ? computeTrend(bestStreakHabit.habit) : 0;
+
+  const stats = [
+    StatCard({ title: 'Tasks Due', value: String(todayDue.length), icon: 'check', accent: 'accent', trend: `${todayDue.filter((r) => r.overdue).length} overdue` }),
+    StatCard({ title: 'Habit Streak', value: `${habitStats.currentStreak} days`, icon: 'flame', trend: `${streakTrend >= 0 ? '+' : ''}${streakTrend}% vs last week`, accent: 'warning' }),
+    StatCard({ title: 'Events Today', value: String(evtsToday.length), icon: 'calendar', accent: 'success' }),
+    StatCard({ title: 'Notes This Week', value: String(notesWeek.length), icon: 'fileText' }),
+  ].join('');
+
+  // ---- Today's overview: real tasks due today/overdue ----
+  const todayBody = todayDue.length
+    ? todayDue
+        .sort((a, b) => (a.overdue === b.overdue ? 0 : a.overdue ? -1 : 1))
+        .slice(0, 6)
+        .map(({ task, project, overdue }) =>
+          TaskItem({
+            id: task.id,
+            title: task.title,
+            category: project.title,
+            priority: (project.priority || '').toLowerCase(),
+            dueTime: overdue ? 'Overdue' : 'Due today',
+            done: false,
+          })
+        )
+        .join('')
     : emptyState({ icon: 'check', title: 'Nothing due today', description: 'Enjoy the clear schedule.', size: 'sm' });
 
   const recentProjects = [...allProjects]
@@ -130,13 +191,6 @@ export function renderDashboard(container) {
   const habitsBody = previewHabits.length
     ? previewHabits.map((h) => HabitItem(h)).join('')
     : emptyState({ icon: 'flame', title: 'No habits yet', description: 'Start one to build a streak.', size: 'sm' });
-
-  const statsWithLiveStreak = d.stats.map((s) => {
-    if (s.id !== 'streak') return s;
-    const bestStreakHabit = topStreaks('current', 1)[0];
-    const trend = bestStreakHabit ? computeTrend(bestStreakHabit.habit) : 0;
-    return { ...s, value: `${dashboardHabitStats.currentStreak} days`, trend: `${trend >= 0 ? '+' : ''}${trend}% vs last week` };
-  });
 
   const activeResources = allResources
     .filter((r) => r.status === 'In Progress')
@@ -225,9 +279,7 @@ export function renderDashboard(container) {
         <p class="dashboard__hero-subtitle">Let's make today count.</p>
       </div>
 
-      <div class="dashboard__stats">
-        ${statsWithLiveStreak.map((s) => StatCard(s)).join('')}
-      </div>
+      <div class="dashboard__stats">${stats}</div>
 
       <div class="quick-actions" id="quick-actions" aria-label="Quick actions">
         ${quickActions.map((qa) => QuickActionButton(qa)).join('')}
@@ -252,14 +304,26 @@ export function renderDashboard(container) {
     </div>
   `;
 
-  // Task checkbox toggle
+  // Task checkbox toggle — mutates the real project task and persists.
   container.querySelectorAll('.task-item').forEach((row) => {
     const toggle = () => {
       row.classList.toggle('is-done');
       const isDone = row.classList.contains('is-done');
       row.setAttribute('aria-checked', String(isDone));
-      const task = d.tasks.find((t) => String(t.id) === row.dataset.id);
-      if (task) task.done = isDone;
+      const taskId = row.dataset.id;
+      for (const p of allProjects) {
+        const task = (p.tasks || []).find((t) => t.id === taskId);
+        if (task) {
+          task.done = isDone;
+          const done = p.tasks.filter((t) => t.done).length;
+          p.taskCount = p.tasks.length;
+          p.completedTaskCount = done;
+          p.progress = p.tasks.length ? Math.round((done / p.tasks.length) * 100) : 0;
+          p.updatedAt = new Date().toISOString().slice(0, 10);
+          saveProjects();
+          break;
+        }
+      }
     };
     row.addEventListener('click', toggle);
     row.addEventListener('keydown', (e) => {
@@ -270,9 +334,7 @@ export function renderDashboard(container) {
     });
   });
 
-  // Habit "done today" toggle — dashboard preview stays a simple binary
-  // toggle (done / not done); the full 3-state cycle (done/skipped/undo)
-  // lives on the Habits page itself, see habits/components.js.
+  // Habit "done today" toggle — writes real completion history.
   container.querySelectorAll('.habit-item__check').forEach((btn) => {
     btn.addEventListener('click', () => {
       const isDone = !btn.classList.contains('is-done');
@@ -288,8 +350,7 @@ export function renderDashboard(container) {
     });
   });
 
-  // Quick actions open the command palette (quick-capture) rather than a
-  // non-functional stub — no backend exists yet to actually create anything.
+  // Quick actions open the command palette (quick-capture).
   container.querySelector('.quick-actions')?.addEventListener('click', (e) => {
     if (e.target.closest('.quick-action')) {
       document.getElementById('search-trigger').click();
@@ -309,10 +370,12 @@ export function renderEmptyState(container, { label, icon: iconName, phase }) {
 export function renderSettings(container) {
   const theme = getState().theme;
   const activeWorkspaceId = getState().workspaceId;
+  const profile = getProfile();
 
   const profileContent = `
-    <div class="field"><label for="set-name">Name</label><input id="set-name" type="text" value="${currentUser.name}"></div>
-    <div class="field"><label for="set-email">Email</label><input id="set-email" type="email" value="${currentUser.email}"></div>
+    <div class="field"><label for="set-name">Name</label><input id="set-name" type="text" value="${profile.name}"></div>
+    <div class="field"><label for="set-email">Email</label><input id="set-email" type="email" value="${profile.email}"></div>
+    <div class="settings-row"><button type="button" class="btn btn--primary" id="settings-save-profile">Save profile</button><span class="settings-row__meta" id="settings-profile-status" aria-live="polite"></span></div>
   `;
 
   const appearanceContent = `
@@ -340,6 +403,14 @@ export function renderSettings(container) {
     )
     .join('');
 
+  const dataContent = `
+    <p class="settings-row__desc">All data is stored locally in your browser (IndexedDB). Nothing leaves your machine.</p>
+    <div class="settings-row">
+      <button type="button" class="btn btn--secondary" id="settings-reset-data">Reset demo data</button>
+      <span class="settings-row__meta">Clears everything and re-seeds the sample data.</span>
+    </div>
+  `;
+
   const shortcutsContent = `
     <div class="settings-row"><span class="settings-row__body">Open command palette</span><kbd>Ctrl / ⌘</kbd><kbd>K</kbd></div>
     <div class="settings-row"><span class="settings-row__body">Navigate results</span><kbd>↑</kbd><kbd>↓</kbd></div>
@@ -351,6 +422,7 @@ export function renderSettings(container) {
       ${SectionCard({ title: 'Profile', content: profileContent })}
       ${SectionCard({ title: 'Appearance', content: appearanceContent })}
       ${SectionCard({ title: 'Workspaces', content: workspacesContent })}
+      ${SectionCard({ title: 'Data', content: dataContent })}
       ${SectionCard({ title: 'Keyboard shortcuts', content: shortcutsContent })}
     </div>
   `;
@@ -362,5 +434,28 @@ export function renderSettings(container) {
         .querySelectorAll('[data-theme-option]')
         .forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
     });
+  });
+
+  document.getElementById('settings-save-profile').addEventListener('click', async () => {
+    const name = document.getElementById('set-name').value.trim();
+    const email = document.getElementById('set-email').value.trim();
+    if (!name || !email) {
+      const status = document.getElementById('settings-profile-status');
+      status.textContent = 'Name and email are required.';
+      return;
+    }
+    await saveProfile({ name, email });
+    const status = document.getElementById('settings-profile-status');
+    status.textContent = 'Saved.';
+    document.getElementById('profile-trigger').innerHTML = `<span class="avatar avatar--md">${getProfile().initials}</span>`;
+    setTimeout(() => { status.textContent = ''; }, 2500);
+  });
+
+  document.getElementById('settings-reset-data').addEventListener('click', async () => {
+    if (!window.confirm('Reset all Atlas data to the sample data? This cannot be undone.')) return;
+    const { resetAllData } = await import('./persistence.js');
+    await resetAllData();
+    const { rerender } = await import('./router.js');
+    rerender();
   });
 }

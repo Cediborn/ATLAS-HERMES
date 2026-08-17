@@ -4,17 +4,25 @@
 // than in data.js, mirroring calendar/repository.js (raw+adapt) vs
 // calendar/state.js (derive+UI state).
 
-import { habits, completions, isDueOn, habitById, CATEGORY_CONFIG, FREQUENCY_CONFIG, WEEKDAY_LABELS, STREAK_MILESTONES } from './data.js';
+import { habits, completions, isDueOn, habitById, createHabitId, CATEGORY_CONFIG, FREQUENCY_CONFIG, WEEKDAY_LABELS, STREAK_MILESTONES } from './data.js';
 import { dateKey, todayDate, todayKey, monthGridDays } from '../date-utils.js';
+import { saveHabits, saveCompletions } from '../persistence.js';
 
-// ---- Completion index — built once from data.js's flat list, then mutated
+// ---- Completion index — built from data.js's flat list, then mutated
 // directly (same "no separate copy" rule as calendar/repository.js's local
-// events array: this Map IS the live source of truth from here on). ----
+// events array: this Map IS the live source of truth from here on).
+// Rebuilt whenever persistence hydrates the arrays from IndexedDB. ----
 const completionIndex = new Map(); // habitId -> Map(dateKey -> 'done'|'skipped')
-for (const c of completions) {
-  if (!completionIndex.has(c.habitId)) completionIndex.set(c.habitId, new Map());
-  completionIndex.get(c.habitId).set(c.date, c.status);
+
+export function rebuildCompletionIndex() {
+  completionIndex.clear();
+  for (const c of completions) {
+    if (!completionIndex.has(c.habitId)) completionIndex.set(c.habitId, new Map());
+    completionIndex.get(c.habitId).set(c.date, c.status);
+  }
 }
+
+rebuildCompletionIndex();
 
 export function getStatusOn(habitId, dateKeyStr) {
   return completionIndex.get(habitId)?.get(dateKeyStr) || null;
@@ -26,9 +34,19 @@ export function setCompletionStatus(habitId, dateKeyStr, status) {
     map = new Map();
     completionIndex.set(habitId, map);
   }
-  if (status === null) map.delete(dateKeyStr);
-  else map.set(dateKeyStr, status);
+  // Keep the flat `completions` array (the persisted representation) in sync
+  // with the Map so js/persistence.js's saveCompletions() captures reality.
+  const existingIdx = completions.findIndex((c) => c.habitId === habitId && c.date === dateKeyStr);
+  if (status === null) {
+    map.delete(dateKeyStr);
+    if (existingIdx !== -1) completions.splice(existingIdx, 1);
+  } else {
+    map.set(dateKeyStr, status);
+    if (existingIdx !== -1) completions[existingIdx].status = status;
+    else completions.push({ habitId, date: dateKeyStr, status });
+  }
   invalidateVisibleHabitsCache();
+  saveCompletions();
 }
 
 // Three-state cycle for the CompletionButton's own click: incomplete -> done
@@ -403,10 +421,11 @@ export function createHabit(data) {
     customDays: null, goal: null, tags: [], notes: '', favorite: false, archived: false,
     linkedProjectId: null, goalId: null,
     ...data,
-    id: `h${Date.now()}`, createdAt: now, updatedAt: now,
+    id: createHabitId(), createdAt: now, updatedAt: now,
   };
   habits.push(habit);
   invalidateVisibleHabitsCache();
+  saveHabits();
   return habit;
 }
 
@@ -415,22 +434,33 @@ export function updateHabit(id, patch) {
   if (!h) return null;
   Object.assign(h, patch, { updatedAt: todayKey() });
   invalidateVisibleHabitsCache();
+  saveHabits();
   return h;
 }
 
 export function deleteHabit(id) {
   const idx = habits.findIndex((h) => h.id === id);
   if (idx !== -1) habits.splice(idx, 1);
+  // Drop this habit's completion history too — orphaned completions would
+  // otherwise survive forever and inflate nothing, but would still be written
+  // back on every save.
+  completionIndex.delete(id);
+  for (let i = completions.length - 1; i >= 0; i -= 1) {
+    if (completions[i].habitId === id) completions.splice(i, 1);
+  }
   invalidateVisibleHabitsCache();
+  saveHabits();
+  saveCompletions();
 }
 
 export function duplicateHabit(id) {
   const h = habitById(id);
   if (!h) return null;
   const now = todayKey();
-  const copy = { ...h, id: `h${Date.now()}`, title: `${h.title} (copy)`, favorite: false, createdAt: now, updatedAt: now };
+  const copy = { ...h, id: createHabitId(), title: `${h.title} (copy)`, favorite: false, createdAt: now, updatedAt: now };
   habits.push(copy);
   invalidateVisibleHabitsCache();
+  saveHabits();
   return copy;
 }
 
@@ -439,6 +469,7 @@ export function toggleFavorite(id) {
   if (h) {
     h.favorite = !h.favorite;
     invalidateVisibleHabitsCache();
+    saveHabits();
   }
   return h;
 }
@@ -448,6 +479,7 @@ export function toggleArchived(id) {
   if (h) {
     h.archived = !h.archived;
     invalidateVisibleHabitsCache();
+    saveHabits();
   }
   return h;
 }
