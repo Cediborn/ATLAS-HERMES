@@ -97,10 +97,7 @@ function withMeta(list, kind) {
   return list.map((item, i) => ({ ...item, workspaceId: inferWorkspace(item, kind), _order: i }));
 }
 
-async function seedIfNeeded() {
-  const seeded = await db.getMeta(SEEDED_KEY);
-  if (seeded?.value) return;
-
+async function seedAll() {
   await db.putMany('projects', withMeta(projects, 'project'));
   await db.putMany('events', withMeta(events, 'event'));
   await db.putMany('notes', withMeta(notes, 'note'));
@@ -113,6 +110,12 @@ async function seedIfNeeded() {
   await db.putMany('codingItems', withMeta(codingItems, 'coding'));
   await db.putMany('codingSessions', withMeta(practiceSessions, 'coding'));
   await db.putMeta('profile', DEFAULT_PROFILE);
+}
+
+async function seedIfNeeded() {
+  const seeded = await db.getMeta(SEEDED_KEY);
+  if (seeded?.value) return;
+  await seedAll();
   await db.putMeta(SEEDED_KEY, true);
 }
 
@@ -161,6 +164,14 @@ export async function hydrate() {
 export async function switchWorkspace(workspaceId) {
   setState({ workspaceId });
   await hydrateWorkspace(workspaceId);
+}
+
+// Adds the sample dataset back alongside the user's own data. Safe to run any
+// time: seed ids are fixed (p1, e1, …) and user-created ids are
+// timestamp+random, so nothing user-made is overwritten.
+export async function loadDemoData() {
+  await seedAll();
+  await hydrateWorkspace(activeWorkspaceId());
 }
 
 export async function resetAllData() {

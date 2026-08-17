@@ -308,3 +308,30 @@
 .progress--success .progress__fill { background: var(--color-success); }
 .progress--danger .progress__fill { background: var(--color-danger); }
 .progress--neutral .progress__fill { background: var(--color-text-tertiary); }
+
+/* ================= WELCOME BANNER ================= */
+.welcome-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-12);
+  padding: var(--space-12) var(--space-16);
+  margin-bottom: var(--space-24);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+.welcome-banner__body { flex: 1; font-size: var(--text-sm); line-height: 1.55; color: var(--color-text-secondary); }
+.welcome-banner__body strong { color: var(--color-text); }
+.welcome-banner__close {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+}
+.welcome-banner__close:hover { background: var(--color-bg-inset); color: var(--color-text); }

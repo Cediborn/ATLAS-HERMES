@@ -10,6 +10,7 @@ import { initCommandPalette } from './command-palette.js';
 import { initRouter, navigate, rerender } from './router.js';
 import { initLuna } from './luna.js';
 import { hydrate, switchWorkspace } from './persistence.js';
+import { syncBrowserNotifications } from './browser-notifications.js';
 
 // Data layer must be ready (IndexedDB hydrated into the in-memory arrays)
 // before any view renders — otherwise the first paint would show empty/seed
@@ -36,6 +37,25 @@ async function boot() {
 
   await hydrate();
   initRouter();
+
+  registerServiceWorker();
+
+  // Surface real, computed items as system notifications when the toggle in
+  // Settings is on and permission is granted. Re-sync whenever the tab becomes
+  // visible again so items that arrived while hidden aren't missed.
+  syncBrowserNotifications();
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) syncBrowserNotifications();
+  });
+}
+
+// PWA offline support — only in secure contexts (https or localhost).
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  if (location.protocol !== 'https:' && !['localhost', '127.0.0.1'].includes(location.hostname)) return;
+  navigator.serviceWorker.register('./sw.js').catch(() => {
+    // SW registration failed (private browsing etc.) — app still works online.
+  });
 }
 
 boot();

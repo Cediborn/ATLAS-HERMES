@@ -310,3 +310,24 @@ the end-to-end UI driver clicking "New Project" and asserting the overlay was vi
 **Remaining known limitations** (unchanged from §9 unless stated): all storage is local to
 the browser — there's still no auth or cloud sync; the cloud path is documented in the
 README and deliberately kept as the `db.js`/`persistence.js` seam.
+
+### 1.8 — Feature polish: PWA, browser notifications, demo data
+
+- **PWA / offline:** `app/manifest.webmanifest` (installable, standalone) + `app/sw.js`
+  (cache-first assets with background refresh, network-first navigations, offline
+  fallback to the cached shell). Registered in `js/main.js` for secure contexts.
+- **Browser notifications:** opt-in toggle in Settings → Notifications. Permission is
+  requested only when the user turns it on; system notifications mirror the same
+  real, data-computed items as the in-app panel and deep-link to the module
+  (`js/browser-notifications.js`).
+- **Demo data on demand:** Settings → Data → *Load demo data* re-adds the sample
+  dataset alongside user data (`loadDemoData()` in `js/persistence.js`); seed ids
+  never collide with user-created ids. *Reset demo data* unchanged.
+- **Onboarding:** one-time dismissible welcome banner on the dashboard.
+- **`.nojekyll`:** added at the repo root so GitHub Pages serves the static files
+  as-is instead of running the Jekyll build (removes the entire class of
+  Jekyll/Liquid build failures; the theme stylesheet it previously emitted was
+  never referenced).
+- Verified in headless Chrome: `tests/polish-driver.mjs` (12/12 — welcome banner,
+  manifest, SW registration/control, offline render from cache, notification
+  toggle, demo-data restore) plus the existing route sweep (11/11) and UI e2e (9/9).

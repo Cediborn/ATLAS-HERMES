@@ -1,0 +1,18 @@
+{
+  "name": "Atlas — Personal OS",
+  "short_name": "Atlas",
+  "description": "Atlas — your personal operating system. Tasks, notes, calendar, habits, learning, and finance in one calm, fast, keyboard-first system.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0B0C0F",
+  "theme_color": "#0B0C0F",
+  "icons": [
+    {
+      "src": "../assets/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

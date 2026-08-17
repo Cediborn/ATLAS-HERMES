@@ -7,6 +7,7 @@ import { quickActions, workspaces } from './config.js';
 import { getState } from './store.js';
 import { setTheme } from './theme.js';
 import { getProfile, saveProfile, saveProjects } from './persistence.js';
+import { notificationsEnabled, setNotificationsEnabled } from './browser-notifications.js';
 import { timeAgo, todayKey, formatDate, dateKey } from './date-utils.js';
 import { projects as allProjects } from './projects/data.js';
 import { notes as allNotes } from './notes/data.js';
@@ -271,8 +272,16 @@ export function renderDashboard(container) {
         .join('')
     : emptyState({ icon: 'code', title: 'Nothing in the queue', description: 'Pick up a problem or build.', size: 'sm' });
 
+  const welcome = !localStorage.getItem('atlas:welcomeSeen')
+    ? `<div class="welcome-banner" role="status">
+        <div class="welcome-banner__body"><strong>Welcome to Atlas.</strong> Everything you create is saved locally in your browser — nothing leaves your machine. Press <kbd>Ctrl/⌘</kbd><kbd>K</kbd> to search or jump anywhere.</div>
+        <button type="button" class="welcome-banner__close" id="welcome-dismiss" aria-label="Dismiss welcome message">${icon('x', { size: 16 })}</button>
+      </div>`
+    : '';
+
   container.innerHTML = `
     <div class="dashboard">
+      ${welcome}
       <div class="dashboard__hero">
         <h2>${greeting}, ${firstName}.</h2>
         <p class="dashboard__hero-date">${dateStr}</p>
@@ -303,6 +312,14 @@ export function renderDashboard(container) {
       </div>
     </div>
   `;
+
+  const dismissWelcome = container.querySelector('#welcome-dismiss');
+  if (dismissWelcome) {
+    dismissWelcome.addEventListener('click', () => {
+      try { localStorage.setItem('atlas:welcomeSeen', '1'); } catch { /* ignore */ }
+      dismissWelcome.closest('.welcome-banner')?.remove();
+    });
+  }
 
   // Task checkbox toggle — mutates the real project task and persists.
   container.querySelectorAll('.task-item').forEach((row) => {
@@ -392,6 +409,16 @@ export function renderSettings(container) {
     </div>
   `;
 
+  const notifEnabled = notificationsEnabled();
+  const notificationsContent = `
+    <p class="settings-row__desc">Get system notifications for the same real items shown in the in-app panel — upcoming events, due projects, habit reminders. Permission is requested only when you turn this on.</p>
+    <div class="switch-group" role="group" aria-label="Browser notifications">
+      <button type="button" class="switch-group__option" id="settings-notif-on" aria-pressed="${notifEnabled}">${icon('bell', { size: 16 })}<span>On</span></button>
+      <button type="button" class="switch-group__option" id="settings-notif-off" aria-pressed="${!notifEnabled}">${icon('bell', { size: 16 })}<span>Off</span></button>
+    </div>
+    <div class="settings-row"><span class="settings-row__meta" id="settings-notif-status" aria-live="polite"></span></div>
+  `;
+
   const workspacesContent = workspaces
     .map(
       (w) => `
@@ -405,6 +432,10 @@ export function renderSettings(container) {
 
   const dataContent = `
     <p class="settings-row__desc">All data is stored locally in your browser (IndexedDB). Nothing leaves your machine.</p>
+    <div class="settings-row">
+      <button type="button" class="btn btn--secondary" id="settings-load-demo">Load demo data</button>
+      <span class="settings-row__meta">Adds the sample dataset alongside your own data.</span>
+    </div>
     <div class="settings-row">
       <button type="button" class="btn btn--secondary" id="settings-reset-data">Reset demo data</button>
       <span class="settings-row__meta">Clears everything and re-seeds the sample data.</span>
@@ -421,6 +452,7 @@ export function renderSettings(container) {
     <div class="settings-page">
       ${SectionCard({ title: 'Profile', content: profileContent })}
       ${SectionCard({ title: 'Appearance', content: appearanceContent })}
+      ${SectionCard({ title: 'Notifications', content: notificationsContent })}
       ${SectionCard({ title: 'Workspaces', content: workspacesContent })}
       ${SectionCard({ title: 'Data', content: dataContent })}
       ${SectionCard({ title: 'Keyboard shortcuts', content: shortcutsContent })}
@@ -434,6 +466,32 @@ export function renderSettings(container) {
         .querySelectorAll('[data-theme-option]')
         .forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
     });
+  });
+
+  const notifStatus = document.getElementById('settings-notif-status');
+  const notifButtons = [document.getElementById('settings-notif-on'), document.getElementById('settings-notif-off')];
+  notifButtons.forEach((btn) => {
+    if (!btn) return;
+    btn.addEventListener('click', async () => {
+      const turnOn = btn.id === 'settings-notif-on';
+      const result = await setNotificationsEnabled(turnOn);
+      const enabled = result === 'granted';
+      document.getElementById('settings-notif-on').setAttribute('aria-pressed', String(enabled));
+      document.getElementById('settings-notif-off').setAttribute('aria-pressed', String(!enabled));
+      notifStatus.textContent =
+        result === 'granted' ? 'Notifications enabled.'
+        : result === 'denied' ? 'Permission was denied — allow notifications for this site in your browser settings.'
+        : result === 'unsupported' ? 'This browser does not support notifications.'
+        : result === 'dismissed' ? 'Permission prompt dismissed.'
+        : 'Notifications off.';
+    });
+  });
+
+  document.getElementById('settings-load-demo').addEventListener('click', async () => {
+    const { loadDemoData } = await import('./persistence.js');
+    await loadDemoData();
+    const { rerender } = await import('./router.js');
+    rerender();
   });
 
   document.getElementById('settings-save-profile').addEventListener('click', async () => {

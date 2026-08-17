@@ -100,6 +100,23 @@ module/item when selected.
 Generated from real data: upcoming events, overdue projects, approaching goal deadlines,
 unfinished tasks, habit due today. No fabricated notifications.
 
+Optional **browser notifications** (Settings → Notifications): permission is only requested
+when you flip the toggle on, and system notifications mirror the same real in-app items —
+clicking one jumps to the relevant module.
+
+## Offline & install (PWA)
+
+Atlas is a progressive web app: `app/manifest.webmanifest` makes it installable, and
+`app/sw.js` caches the app shell and assets so it keeps working offline after the first
+visit (navigations go network-first, assets stale-while-revalidate). Bump `VERSION` in
+`app/sw.js` when deploying a new build to force clients onto it.
+
+## Data
+
+Settings → Data has **Load demo data** (adds the sample dataset alongside your own data —
+seed ids never collide with user-created ids) and **Reset demo data** (clears everything and
+re-seeds). The dashboard also shows a one-time welcome banner on first run.
+
 ## Testing
 
 ```bash
@@ -107,6 +124,8 @@ python3 -m http.server 8123   # tests run in headless Chrome against a local ser
 node tests/cdp-driver.mjs "http://127.0.0.1:8123/tests/run-tests.html?run=1"
 node tests/cdp-driver.mjs "http://127.0.0.1:8123/tests/run-tests.html?run=2"   # same profile = reload
 node tests/ui-driver.mjs      # end-to-end: create a project through the real UI, reload, search
+node tests/polish-driver.mjs  # PWA/offline, welcome banner, notification toggle, demo data
+node tests/route-sweep.mjs    # visit every module, assert clean render
 ```
 
 The persistence harness runs twice in the same Chrome profile: run 1 creates data, run 2
