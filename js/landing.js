@@ -7,10 +7,10 @@ import { initTheme } from './theme.js';
 initTheme();
 
 const philosophy = [
-  { icon: 'sun', title: 'Calm by default', desc: 'Minimal chrome. Content over UI. No dashboard clutter for clutter\u2019s sake.' },
-  { icon: 'arrowRight', title: 'Fast is a feature', desc: 'Optimistic UI everywhere \u2014 no spinners for the actions you do every day.' },
-  { icon: 'layers', title: 'One system, not seven', desc: 'Every pillar shares primitives, and one search box spans all of it.' },
-  { icon: 'check', title: 'You own your data', desc: 'Everything exports to JSON or Markdown. No lock-in, no dark patterns.' },
+  { icon: 'check', title: 'Local-first & persistent', desc: 'Every project, note, habit, and transaction lives in your browser (IndexedDB). Refresh, restart, or go offline \u2014 it\u2019s all still there.' },
+  { icon: 'layers', title: 'Workspaces, not folders', desc: 'Personal, University, and Startup are real data scopes \u2014 switch contexts and the whole system follows.' },
+  { icon: 'search', title: 'One search, everything', desc: 'The command palette finds projects, tasks, notes, events, goals, and books \u2014 then takes you straight to the item.' },
+  { icon: 'sparkle', title: 'LUNA, your local AI', desc: 'Ask LUNA about your day in plain language. It reads your live data on-device \u2014 nothing leaves your machine.' },
 ];
 
 document.getElementById('philosophy').innerHTML = philosophy

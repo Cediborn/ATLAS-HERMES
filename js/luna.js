@@ -20,11 +20,15 @@ import { getEventsInRange } from './calendar/repository.js';
 import { formatTime } from './calendar/state.js';
 
 let fabEl = null;
+let wrapEl = null;
 let panelEl = null;
 let messagesEl = null;
 let inputEl = null;
 let suggestionsEl = null;
+let collapsed = false;
 let initialized = false;
+
+const COLLAPSE_KEY = 'atlas:lunaCollapsed';
 
 // ================= INTENT ROUTING =================
 
@@ -185,10 +189,13 @@ function mount() {
   const root = document.createElement('div');
   root.id = 'luna-root';
   root.innerHTML = `
-    <button type="button" class="luna-fab" id="luna-fab" aria-label="Ask LUNA" aria-expanded="false" aria-controls="luna-panel">
-      <span class="luna-fab__icon">${icon('sparkle', { size: 20 })}</span>
-      <span class="luna-fab__label">Ask LUNA</span>
-    </button>
+    <div class="luna-fab-wrap" id="luna-fab-wrap">
+      <button type="button" class="luna-fab" id="luna-fab" aria-label="Ask LUNA" aria-expanded="false" aria-controls="luna-panel">
+        <span class="luna-fab__icon">${icon('sparkle', { size: 20 })}</span>
+        <span class="luna-fab__label">Ask LUNA</span>
+      </button>
+      <button type="button" class="luna-fab__collapse" id="luna-collapse" aria-label="Collapse LUNA" title="Collapse LUNA">${icon('chevronDown', { size: 14 })}</button>
+    </div>
 
     <section class="luna-panel" id="luna-panel" role="dialog" aria-modal="false" aria-label="LUNA assistant" hidden>
       <header class="luna-panel__header">
@@ -197,6 +204,7 @@ function mount() {
           <span class="luna-panel__name">LUNA</span>
           <span class="luna-panel__status">online \u00b7 Atlas assistant</span>
         </div>
+        <button type="button" class="icon-btn luna-panel__min" id="luna-min" aria-label="Minimize LUNA" title="Minimize LUNA">${icon('chevronDown', { size: 17 })}</button>
         <button type="button" class="icon-btn luna-panel__close" id="luna-close" aria-label="Close LUNA">${icon('x', { size: 17 })}</button>
       </header>
 
@@ -219,12 +227,44 @@ export function initLuna() {
   mount();
 
   fabEl = document.getElementById('luna-fab');
+  wrapEl = document.getElementById('luna-fab-wrap');
   panelEl = document.getElementById('luna-panel');
   messagesEl = document.getElementById('luna-messages');
   suggestionsEl = document.getElementById('luna-suggestions');
   inputEl = document.getElementById('luna-input');
   const closeBtn = document.getElementById('luna-close');
+  const collapseBtn = document.getElementById('luna-collapse');
+  const minBtn = document.getElementById('luna-min');
   const form = document.getElementById('luna-form');
+
+  // ---- Collapse / expand: shrink the whole assistant to a compact dot ----
+  function collapse() {
+    collapsed = true;
+    try { localStorage.setItem(COLLAPSE_KEY, '1'); } catch { /* ignore */ }
+    wrapEl.classList.add('is-collapsed');
+    fabEl.setAttribute('aria-label', 'Expand LUNA');
+    panelEl.hidden = true;
+    fabEl.setAttribute('aria-expanded', 'false');
+    fabEl.focus();
+  }
+
+  function expand() {
+    collapsed = false;
+    try { localStorage.removeItem(COLLAPSE_KEY); } catch { /* ignore */ }
+    wrapEl.classList.remove('is-collapsed');
+    fabEl.setAttribute('aria-label', 'Ask LUNA');
+  }
+
+  // Restore the persisted collapsed state on boot.
+  try {
+    collapsed = localStorage.getItem(COLLAPSE_KEY) === '1';
+  } catch {
+    collapsed = false;
+  }
+  if (collapsed) {
+    wrapEl.classList.add('is-collapsed');
+    fabEl.setAttribute('aria-label', 'Expand LUNA');
+  }
 
   function open() {
     panelEl.hidden = false;
@@ -299,7 +339,19 @@ export function initLuna() {
     }, 200 + Math.random() * 200);
   }
 
-  fabEl.addEventListener('click', () => (panelEl.hidden ? open() : close()));
+  fabEl.addEventListener('click', () => {
+    if (collapsed) {
+      expand();
+      return;
+    }
+    if (panelEl.hidden) open();
+    else close();
+  });
+  collapseBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    collapse();
+  });
+  minBtn.addEventListener('click', () => collapse());
   closeBtn.addEventListener('click', () => close());
   form.addEventListener('submit', (e) => {
     e.preventDefault();

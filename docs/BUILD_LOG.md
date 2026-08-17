@@ -331,3 +331,21 @@ README and deliberately kept as the `db.js`/`persistence.js` seam.
 - Verified in headless Chrome: `tests/polish-driver.mjs` (12/12 — welcome banner,
   manifest, SW registration/control, offline render from cache, notification
   toggle, demo-data restore) plus the existing route sweep (11/11) and UI e2e (9/9).
+
+### 1.9 — LUNA collapsible + landing page refresh
+
+- **LUNA is now collapsible:** the floating assistant shrinks to a compact
+  icon-only dot via a collapse notch on the FAB or a minimize button in the
+  panel header. The collapsed state persists (`atlas:lunaCollapsed`), and the
+  compact dot expands it back. `js/luna.js` + `css/luna.css`.
+- **Landing page matches the real app:** hero now leads with persistence
+  (badges: persistent by default, offline PWA, real workspaces, LUNA AI);
+  the pillar grid is the actual twelve-capability set (nine data modules,
+  workspaces, command palette, LUNA) instead of the old roadmap copy; the
+  hero palette demo types real searches ("build atlas", "atomic habits",
+  "team sync", "pay rent"); philosophy highlights local-first persistence,
+  workspaces, global search, and LUNA. `index.html`, `js/landing.js`,
+  `js/mock-data.js`, `css/landing.css`.
+- Verified in headless Chrome: `tests/luna-landing-driver.mjs` (14/14 —
+  collapse/persist/expand, minimize, hero badges, 12 cards, palette demo)
+  plus the existing route sweep (11/11) and UI e2e (9/9).

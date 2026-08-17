@@ -76,6 +76,18 @@
 .hero__actions { display: flex; gap: var(--space-12); }
 .hero__actions .btn { height: 48px; padding: 0 var(--space-24); font-size: var(--text-base); }
 
+/* ---- Hero badges: the real Atlas capabilities at a glance ---- */
+.hero__badges { display: flex; flex-wrap: wrap; gap: var(--space-8); margin-top: var(--space-20); }
+.hero__badge {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-secondary);
+  padding: var(--space-4) var(--space-10);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+}
+
 /* ---- Hero visual: command palette demo ---- */
 .hero__visual {
   width: min(640px, 92vw);

@@ -1,11 +1,13 @@
 /* Atlas — LUNA floating assistant. */
 
 /* ================= FLOATING ACTION BUTTON ================= */
-.luna-fab {
+.luna-fab-wrap {
   position: fixed;
   right: var(--space-20);
   bottom: var(--space-20);
   z-index: 34;
+}
+.luna-fab {
   display: inline-flex;
   align-items: center;
   gap: var(--space-8);
@@ -19,11 +21,37 @@
   font-weight: var(--weight-semibold);
   cursor: pointer;
   box-shadow: var(--shadow-modal);
-  transition: transform var(--duration-standard) var(--ease-atlas), background var(--duration-standard) var(--ease-atlas);
+  transition: padding var(--duration-standard) var(--ease-atlas), transform var(--duration-standard) var(--ease-atlas), background var(--duration-standard) var(--ease-atlas);
 }
 .luna-fab:hover { background: var(--color-accent-solid-hover); transform: translateY(-1px); }
 .luna-fab:focus-visible { outline: 2px solid var(--color-accent-solid); outline-offset: 2px; }
 .luna-fab__icon { display: inline-flex; }
+
+/* Collapse control: a small notch on the FAB that shrinks LUNA to a dot. */
+.luna-fab__collapse {
+  position: absolute;
+  right: -4px;
+  top: -4px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  box-shadow: var(--shadow-float);
+  transition: color var(--duration-micro) var(--ease-atlas), border-color var(--duration-micro) var(--ease-atlas);
+}
+.luna-fab__collapse:hover { color: var(--color-accent-text); border-color: var(--color-accent-solid); }
+.luna-fab__collapse:focus-visible { outline: 2px solid var(--color-accent-solid); outline-offset: 1px; }
+
+/* Collapsed state: icon-only dot, label + notch hidden. */
+.luna-fab-wrap.is-collapsed .luna-fab { padding: var(--space-10); }
+.luna-fab-wrap.is-collapsed .luna-fab__label,
+.luna-fab-wrap.is-collapsed .luna-fab__collapse { display: none; }
 
 /* ================= PANEL ================= */
 .luna-panel {
@@ -68,6 +96,7 @@
 .luna-panel__titles { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.2; }
 .luna-panel__name { font-size: var(--text-sm); font-weight: var(--weight-semibold); }
 .luna-panel__status { font-size: var(--text-xs); color: var(--color-text-tertiary); }
+.luna-panel__min,
 .luna-panel__close { flex-shrink: 0; }
 
 /* ================= MESSAGES ================= */
@@ -188,7 +217,7 @@
 
 /* ================= RESPONSIVE ================= */
 @media (max-width: 640px) {
-  .luna-fab { right: var(--space-16); bottom: var(--space-16); }
+  .luna-fab-wrap { right: var(--space-16); bottom: var(--space-16); }
   .luna-fab__label { display: none; }
   .luna-panel { right: var(--space-12); bottom: calc(var(--space-16) + 52px); width: calc(100vw - var(--space-24)); height: min(480px, calc(100vh - var(--space-24) - 52px)); }
 }
