@@ -17,6 +17,8 @@
 }
 
 .stat-card {
+  position: relative;
+  overflow: hidden;
   background: var(--color-surface);
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-md);
@@ -25,6 +27,25 @@
   flex-direction: column;
   gap: var(--space-12);
 }
+/* Gold glow accent — a soft radial bloom in the corner plus a faint gold
+   wash fading down from the top edge. Sits below the card content so text
+   and icons are never tinted. */
+.stat-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(140px 100px at 88% -14%, rgba(230, 198, 109, 0.16), transparent 72%),
+    linear-gradient(180deg, rgba(230, 198, 109, 0.08), transparent 42%);
+}
+.stat-card--accent::before {
+  background:
+    radial-gradient(160px 110px at 88% -14%, rgba(230, 198, 109, 0.26), transparent 72%),
+    linear-gradient(180deg, rgba(230, 198, 109, 0.14), transparent 46%);
+}
+.stat-card > * { position: relative; z-index: 1; }
 .stat-card__top { display: flex; align-items: center; justify-content: space-between; }
 .stat-card__icon {
   width: 32px; height: 32px;

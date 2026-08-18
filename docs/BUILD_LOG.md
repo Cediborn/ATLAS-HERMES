@@ -386,3 +386,9 @@ Brand refresh to match the new gold logo mark:
 - **Logo workspace avatar** (`js/sidebar.js`, `app/index.html`) — the sidebar workspace badge (and the workspace-switcher dropdown rows) now render the gold logo mark instead of the workspace initial; badge styling switched to transparent so the logo tile shows.
 
 Verified with the new `tests/gold-driver.mjs` (splash markup + removal, gold computed styles with dark text, badge pixel = `#e6c66d`) — 12/12, plus full regressions: 12/12 polish, 11/11 routes, 14/14 LUNA/landing, 9/9 UI e2e. (Also hardened `tests/polish-driver.mjs` to use a fresh profile so the first-run banner check is reliable.)
+
+### 1.12 — Gold glow on stat cards
+
+Added a gold glow accent to the shared `StatCard` (dashboard + all modules that use it): a soft radial bloom in the top-right corner plus a faint gold wash fading down from the top edge, via a `::before` layer that sits *below* the card content (children get `position: relative; z-index: 1` so text/icons are never tinted). The `--accent` variant glows stronger. Static, so it trivially respects reduced motion.
+
+Verified with `tests/statglow-driver.mjs` — computed-style checks plus real screenshot pixel sampling: plain card top-right warms to `#37332c`, accent card to `#4d4633`, bottom-left stays pure surface, accent > plain. 10/10, plus gold 12/12 and routes 11/11 regressions.
