@@ -376,3 +376,13 @@ Replaced the original blue rounded-square "A" monogram with the gold nested-tria
 - Sidebar footer badge updated from the stale "Phase 0" to "Atlas · Local-first"
 
 Verified with `tests/verify-logo.mjs` (canvas pixel-sampling confirms the gold-on-dark layer structure) and `tests/logo-driver.mjs` (landing renders the gold mark, manifest/PNGs serve, app boots clean) — 12/12 checks.
+
+### 1.11 — Gold accent, splash screen, logo workspace avatar
+
+Brand refresh to match the new gold logo mark:
+
+- **Gold accent** (`css/tokens.css`) — `--color-accent-solid` is now the logo gold `#E6C66D` in both themes, with a new `--color-on-accent` token (dark `#14151A`) for text/icons that sit on the gold fill (buttons, LUNA FAB, avatar, selected dates, task checks, selection, skip-link). `--color-text-on-accent` (white) stays for danger/success/planning fills, which keep white text. `--color-accent-text` became a readable gold on light (`#8F6A14`, ~4.6:1) and the logo gold on dark; the wash tints warm accordingly. Every rule was audited: ~11 gold-fill rules flipped, all danger/success usages left untouched.
+- **Branded splash screen** (`app/index.html`, `css/app-shell.css`, `js/main.js`) — full-screen Atlas logo + wordmark covers the async IndexedDB hydration gap on boot, holds a readable minimum (~450ms), fades via `--duration-panel`, then removes itself. `role="status"`, respects the global reduced-motion override, z-index 900 (above modals, below the noscript banner).
+- **Logo workspace avatar** (`js/sidebar.js`, `app/index.html`) — the sidebar workspace badge (and the workspace-switcher dropdown rows) now render the gold logo mark instead of the workspace initial; badge styling switched to transparent so the logo tile shows.
+
+Verified with the new `tests/gold-driver.mjs` (splash markup + removal, gold computed styles with dark text, badge pixel = `#e6c66d`) — 12/12, plus full regressions: 12/12 polish, 11/11 routes, 14/14 LUNA/landing, 9/9 UI e2e. (Also hardened `tests/polish-driver.mjs` to use a fresh profile so the first-run banner check is reliable.)

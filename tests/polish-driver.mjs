@@ -8,11 +8,16 @@
 // Offline is simulated through CDP Network.emulateNetworkConditions.
 
 import { spawn } from 'node:child_process';
+import { rmSync } from 'node:fs';
 
 const CHROME = process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const URL = process.argv[2] || 'http://127.0.0.1:8123/app/index.html';
-const PROFILE = process.env.PROFILE || 'C:/Users/damie/AppData/Local/Temp/atlas-polish-profile';
+const PROFILE = process.env.PROFILE || '/tmp/atlas-polish-profile';
 const PORT = Number(process.env.CDP_PORT || 9555);
+
+// Fresh profile every run — the welcome-banner check needs first-run state,
+// and a reused profile can restore stale tabs from a killed session.
+rmSync(PROFILE, { recursive: true, force: true });
 const TIMEOUT_MS = Number(process.env.TIMEOUT_MS || 45000);
 
 const chrome = spawn(CHROME, [

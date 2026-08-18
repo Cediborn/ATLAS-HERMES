@@ -252,7 +252,7 @@
   border: 1.5px solid var(--color-border);
   background: transparent;
   display: flex; align-items: center; justify-content: center;
-  color: var(--color-text-on-accent);
+  color: var(--color-on-accent);
   flex-shrink: 0;
   cursor: pointer;
 }

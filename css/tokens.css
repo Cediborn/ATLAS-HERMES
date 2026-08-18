@@ -80,12 +80,14 @@
   --color-text: #14151A;
   --color-text-secondary: #55575F;
   --color-text-tertiary: #82848C;
-  --color-text-on-accent: #FFFFFF;
+  --color-text-on-accent: #FFFFFF; /* text on danger/success/planning fills */
+  --color-on-accent: #14151A;      /* text on the gold accent fill */
 
-  --color-accent-solid: #3654E0;
-  --color-accent-solid-hover: #2A41B3;
-  --color-accent-text: #3654E0;
-  --color-accent-wash: rgba(54, 84, 224, 0.08);
+  /* Gold accent — matches the Atlas logo mark (#E6C66D on #1E1E1E) */
+  --color-accent-solid: #E6C66D;
+  --color-accent-solid-hover: #D2AF4F;
+  --color-accent-text: #8F6A14;
+  --color-accent-wash: rgba(143, 106, 20, 0.1);
 
   --color-success: #0F6B3D;
   --color-success-wash: rgba(15, 107, 61, 0.1);
@@ -124,12 +126,14 @@
   --color-text: #F5F5F3;
   --color-text-secondary: #ABADB4;
   --color-text-tertiary: #75777E;
-  --color-text-on-accent: #FFFFFF;
+  --color-text-on-accent: #FFFFFF; /* text on danger/success/planning fills */
+  --color-on-accent: #14151A;      /* text on the gold accent fill */
 
-  --color-accent-solid: #3654E0;
-  --color-accent-solid-hover: #4E6BEE;
-  --color-accent-text: #7C97FF;
-  --color-accent-wash: rgba(124, 151, 255, 0.12);
+  /* Gold accent — matches the Atlas logo mark (#E6C66D on #1E1E1E) */
+  --color-accent-solid: #E6C66D;
+  --color-accent-solid-hover: #EFD68A;
+  --color-accent-text: #E6C66D;
+  --color-accent-wash: rgba(230, 198, 109, 0.12);
 
   --color-success: #4ADE80;
   --color-success-wash: rgba(74, 222, 128, 0.12);

@@ -9,6 +9,11 @@ import { createPopover } from './popover.js';
 
 const MOBILE_BREAKPOINT = 768;
 
+// Brand mark — the Atlas logo (dark tile + gold nested triangles). Used as the
+// workspace avatar in the sidebar trigger and the workspace switcher menu.
+const LOGO_SVG =
+  '<svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#1E1E1E"/><polygon points="16,5 5.5,26.5 26.5,26.5" fill="none" stroke="#E6C66D" stroke-width="1.5" stroke-linejoin="round"/><polygon points="16,10 10.75,21.5 21.25,21.5" fill="none" stroke="#E6C66D" stroke-width="3.5" stroke-linejoin="round"/><polygon points="16,15.5 11.9,19.3 20.1,19.3" fill="#E6C66D"/></svg>';
+
 export function renderNav(navItems) {
   const nav = document.getElementById('sidebar-nav');
   nav.innerHTML = navItems
@@ -104,7 +109,7 @@ function initWorkspaceSwitcher() {
       .map(
         (w) => `
         <button class="menu__item" role="option" data-id="${w.id}" aria-selected="${w.id === getState().workspaceId}">
-          <span class="workspace-switcher__badge" style="width:20px;height:20px;font-size:10px;flex-shrink:0;">${w.badge}</span>
+          <span class="workspace-switcher__badge" style="width:20px;height:20px;flex-shrink:0;">${LOGO_SVG}</span>
           <span>${w.name}</span>
         </button>`
       )
@@ -114,7 +119,7 @@ function initWorkspaceSwitcher() {
   function applyActive() {
     const active = workspaces.find((w) => w.id === getState().workspaceId) || workspaces[0];
     nameEl.textContent = active.name;
-    badgeEl.textContent = active.badge;
+    badgeEl.innerHTML = LOGO_SVG;
   }
 
   const popover = createPopover({ trigger, panel: menu, onOpenRender: renderMenu });

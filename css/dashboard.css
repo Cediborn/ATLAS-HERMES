@@ -135,7 +135,7 @@
   display: flex; align-items: center; justify-content: center;
   transition: background-color var(--duration-micro) var(--ease-atlas), border-color var(--duration-micro) var(--ease-atlas);
 }
-.task-item__check svg { width: 11px; height: 11px; color: var(--color-text-on-accent); opacity: 0; transition: opacity var(--duration-micro) var(--ease-atlas); }
+.task-item__check svg { width: 11px; height: 11px; color: var(--color-on-accent); opacity: 0; transition: opacity var(--duration-micro) var(--ease-atlas); }
 .task-item.is-done .task-item__check { background: var(--color-accent-solid); border-color: var(--color-accent-solid); }
 .task-item.is-done .task-item__check svg { opacity: 1; }
 .task-item.is-done .task-item__title { color: var(--color-text-tertiary); text-decoration: line-through; }

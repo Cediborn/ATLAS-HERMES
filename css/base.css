@@ -80,7 +80,7 @@ ul, ol {
 /* ---- Selection ---- */
 ::selection {
   background: var(--color-accent-solid);
-  color: var(--color-text-on-accent);
+  color: var(--color-on-accent);
 }
 
 /* ---- Skip link ---- */
@@ -90,7 +90,7 @@ ul, ol {
   left: var(--space-16);
   z-index: 100;
   background: var(--color-accent-solid);
-  color: var(--color-text-on-accent);
+  color: var(--color-on-accent);
   padding: var(--space-8) var(--space-16);
   border-radius: var(--radius-sm);
   font-weight: var(--weight-medium);

@@ -15,6 +15,19 @@ import { syncBrowserNotifications } from './browser-notifications.js';
 // Data layer must be ready (IndexedDB hydrated into the in-memory arrays)
 // before any view renders — otherwise the first paint would show empty/seed
 // state and the router's initial render would read stale arrays.
+// Branded splash: the data layer hydrates before the first view paints, so the
+// splash covers that gap. Hold it long enough to read, then fade it out.
+const MIN_SPLASH_MS = 450;
+const bootStart = performance.now();
+
+function hideSplash() {
+  const splash = document.getElementById('splash');
+  if (!splash) return;
+  splash.classList.add('is-leaving');
+  // Transition is --duration-panel (320ms); drop it from the DOM afterwards.
+  setTimeout(() => splash.remove(), 400);
+}
+
 async function boot() {
   initTheme();
   renderNav(navItems);
@@ -37,6 +50,7 @@ async function boot() {
 
   await hydrate();
   initRouter();
+  setTimeout(hideSplash, Math.max(0, MIN_SPLASH_MS - (performance.now() - bootStart)));
 
   registerServiceWorker();
 

@@ -47,7 +47,7 @@
 .mini-calendar__day:hover { background: var(--color-surface-hover); }
 .mini-calendar__day.is-outside { color: var(--color-text-tertiary); opacity: 0.5; }
 .mini-calendar__day.is-today { font-weight: var(--weight-bold); color: var(--color-accent-text); }
-.mini-calendar__day.is-selected { background: var(--color-accent-solid); color: var(--color-text-on-accent); }
+.mini-calendar__day.is-selected { background: var(--color-accent-solid); color: var(--color-on-accent); }
 .mini-calendar__dot { position: absolute; bottom: 3px; width: 3px; height: 3px; border-radius: var(--radius-full); background: currentColor; }
 
 /* ================= LEGEND ================= */
@@ -90,7 +90,7 @@
   font-size: var(--text-xs); font-weight: var(--weight-medium);
   border-radius: var(--radius-full);
 }
-.month-cell.is-today .month-cell__date { background: var(--color-accent-solid); color: var(--color-text-on-accent); font-weight: var(--weight-bold); }
+.month-cell.is-today .month-cell__date { background: var(--color-accent-solid); color: var(--color-on-accent); font-weight: var(--weight-bold); }
 .month-cell__events { display: flex; flex-direction: column; gap: 2px; }
 .month-cell__overflow { font-size: 10px; color: var(--color-text-tertiary); text-align: left; padding: 1px var(--space-4); }
 .month-cell__overflow:hover { color: var(--color-accent-text); }

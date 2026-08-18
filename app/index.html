@@ -44,6 +44,12 @@
   <link rel="stylesheet" href="../css/luna.css" />
 </head>
 <body>
+  <!-- Branded splash: shown while the data layer hydrates, fades out once the first view renders -->
+  <div class="splash" id="splash" role="status" aria-label="Loading Atlas">
+    <svg class="splash__logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#1E1E1E"/><polygon points="16,5 5.5,26.5 26.5,26.5" fill="none" stroke="#E6C66D" stroke-width="1.5" stroke-linejoin="round"/><polygon points="16,10 10.75,21.5 21.25,21.5" fill="none" stroke="#E6C66D" stroke-width="3.5" stroke-linejoin="round"/><polygon points="16,15.5 11.9,19.3 20.1,19.3" fill="#E6C66D"/></svg>
+    <span class="splash__wordmark">Atlas</span>
+  </div>
+
   <noscript>
     <div class="noscript-banner">Atlas needs JavaScript enabled to run — it's a fully client-side app, no server involved.</div>
   </noscript>
@@ -56,7 +62,7 @@
       <div class="sidebar__header">
         <div class="workspace-switcher">
           <button type="button" class="workspace-switcher__trigger" id="workspace-trigger" aria-label="Switch workspace">
-            <span class="workspace-switcher__badge" id="workspace-badge">P</span>
+            <span class="workspace-switcher__badge" id="workspace-badge"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#1E1E1E"/><polygon points="16,5 5.5,26.5 26.5,26.5" fill="none" stroke="#E6C66D" stroke-width="1.5" stroke-linejoin="round"/><polygon points="16,10 10.75,21.5 21.25,21.5" fill="none" stroke="#E6C66D" stroke-width="3.5" stroke-linejoin="round"/><polygon points="16,15.5 11.9,19.3 20.1,19.3" fill="#E6C66D"/></svg></span>
             <span class="workspace-switcher__name">Personal</span>
             <span class="workspace-switcher__chevron">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>

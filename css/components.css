@@ -23,7 +23,7 @@
 
 .btn--primary {
   background: var(--color-accent-solid);
-  color: var(--color-text-on-accent);
+  color: var(--color-on-accent);
 }
 .btn--primary:hover {
   background: var(--color-accent-solid-hover);
@@ -130,7 +130,7 @@
   justify-content: center;
   border-radius: var(--radius-full);
   background: var(--color-accent-solid);
-  color: var(--color-text-on-accent);
+  color: var(--color-on-accent);
   font-weight: var(--weight-semibold);
   flex-shrink: 0;
   user-select: none;
