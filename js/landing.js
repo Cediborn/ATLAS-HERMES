@@ -3,6 +3,7 @@
 import { icon } from './icons.js';
 import { pillars, heroDemos } from './mock-data.js';
 import { initTheme } from './theme.js';
+import { wait, waitOrHidden } from './timing.js';
 
 initTheme();
 
@@ -57,45 +58,6 @@ if (!typedEl || !resultEl || !resultIconEl || !resultTitleEl || !resultTimeEl ||
   let loopRunning = false;
   let abortController = null; // AbortController to cancel in-flight waits
   let loopIndex = 0;
-
-  // --- Utility ---
-
-  /**
-   * Wait for `ms` milliseconds, but resolve immediately if the
-   * AbortController has been signaled (tab hidden, loop stopped, etc.).
-   */
-  function wait(ms, signal) {
-    return new Promise((resolve, reject) => {
-      if (signal && signal.aborted) { resolve(); return; }
-      const id = setTimeout(resolve, ms);
-      if (signal) {
-        signal.addEventListener('abort', () => { clearTimeout(id); resolve(); }, { once: true });
-      }
-    });
-  }
-
-  /**
-   * Wait for `ms` ms or until the tab becomes hidden. Returns true
-   * if the tab was hidden (caller should break out of the loop).
-   */
-  function waitOrHidden(ms, signal) {
-    return new Promise((resolve) => {
-      if (signal && signal.aborted) { resolve(false); return; }
-      let resolved = false;
-      const done = (hidden) => {
-        if (resolved) return;
-        resolved = true;
-        clearTimeout(timerId);
-        resolve(hidden);
-      };
-      const timerId = setTimeout(() => done(false), ms);
-      const onVis = () => { if (document.hidden) done(true); };
-      document.addEventListener('visibilitychange', onVis, { once: true });
-      if (signal) {
-        signal.addEventListener('abort', () => done(false), { once: true });
-      }
-    });
-  }
 
   async function typeText(text, signal) {
     typedEl.textContent = '';
