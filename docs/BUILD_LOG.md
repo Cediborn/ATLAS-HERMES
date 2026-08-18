@@ -405,3 +405,7 @@ Verified with `tests/pwa-gold-driver.mjs` — manifest/meta gold, badge PNG vali
 The in-app splash now matches the PWA native splash: gold background (`var(--color-accent-solid)`, the same `#E6C66D` as the manifest `background_color`), dark wordmark (`--color-on-accent`) for contrast, and a soft drop shadow under the dark-tile logo so it lifts off the gold. Boot is now one continuous gold brand moment → dark app.
 
 Verified: gold-driver extended to poll for the splash's settled computed style — gold bg `rgb(230,198,109)` + dark wordmark `rgb(20,21,26)`. 14/14, plus routes 11/11, statglow 10/10, pwa-gold 11/11 regressions. (Also made gold-driver use a fresh profile — a reused one let the service worker serve stale cached CSS and produce false failures.)
+
+### 1.15 — Dark native splash, gold chrome
+
+Flipped the manifest `background_color` back to the dark app background `#0B0C0F` (native PWA splash is dark again) while keeping `theme_color` gold — the mobile browser chrome stays gold. The in-app splash is untouched (still gold). SW cache bumped to `atlas-v8`. pwa-gold-driver expectation updated; 11/11.

@@ -25,7 +25,7 @@ function check(name, ok, detail = '') {
 // --- 1. Manifest ---
 const manifest = await (await fetch(`${BASE}/app/manifest.webmanifest`)).json();
 check('manifest theme_color is gold', manifest.theme_color === '#E6C66D', manifest.theme_color);
-check('manifest background_color is gold', manifest.background_color === '#E6C66D', manifest.background_color);
+check('manifest background_color is dark', manifest.background_color === '#0B0C0F', manifest.background_color);
 
 // --- 2. index.html meta ---
 const html = await (await fetch(`${BASE}/app/index.html`)).text();
