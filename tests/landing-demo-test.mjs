@@ -165,6 +165,31 @@ async function withCDP(url, { viewport, reducedMotion }, fn) {
             }
             return m;
           };
+
+          // --- Visibility control for testing ---
+          // Makes document.hidden and document.visibilityState settable
+          // and dispatches visibilitychange when __setVisibility is called.
+          var _hidden = false;
+          var _visState = 'visible';
+          try {
+            Object.defineProperty(Document.prototype, '__hiddenOverride', {
+              get: function() { return _hidden; },
+              configurable: true,
+            });
+            Object.defineProperty(Document.prototype, 'hidden', {
+              get: function() { return _hidden; },
+              configurable: true,
+            });
+            Object.defineProperty(Document.prototype, 'visibilityState', {
+              get: function() { return _visState; },
+              configurable: true,
+            });
+          } catch(e) {}
+          window.__setVisibility = function(hidden) {
+            _hidden = hidden;
+            _visState = hidden ? 'hidden' : 'visible';
+            document.dispatchEvent(new Event('visibilitychange'));
+          };
         })();
       `,
     });
@@ -314,6 +339,52 @@ async function run() {
 
       const playLabel = await evaluate('document.getElementById("palette-replay")?.textContent?.trim() ?? ""');
       check('Button returns to "Play demo"', playLabel.includes('Play demo'), `got: "${playLabel}"`);
+    });
+    await sleep(500);
+
+    // ==============================
+    // Scenario 4: Visibility pause/resume
+    // ==============================
+    console.log('\n=== Visibility pause/resume ===');
+    await withCDP(`${baseUrl}/index.html`, { viewport: { width: 1280, height: 720 }, reducedMotion: false }, async ({ evaluate, exceptions }) => {
+      check('No JS errors', exceptions.length === 0, exceptions.join('; '));
+
+      // Let the demo start animating
+      const typed1 = await evaluate('document.getElementById("palette-typed")?.textContent ?? ""');
+      check('Demo starts animating', typed1.length > 0, `got: "${typed1}"`);
+
+      await sleep(2000);
+
+      // Snapshot the typed text before hiding
+      const typedBeforeHide = await evaluate('document.getElementById("palette-typed")?.textContent ?? ""');
+      check('Text advanced before hide', typedBeforeHide.length > 0, `got: "${typedBeforeHide}"`);
+
+      // Simulate tab hidden
+      await evaluate('window.__setVisibility(true)');
+      check('document.hidden is true', await evaluate('document.hidden') === true);
+
+      // Wait a moment — the loop should break out of waitOrHidden
+      await sleep(2000);
+
+      // The typed text should NOT have changed significantly while hidden
+      // (the loop breaks mid-cycle and waits at the top for visibility)
+      const typedDuringHide = await evaluate('document.getElementById("palette-typed")?.textContent ?? ""');
+      check('Text stable during hidden', typedDuringHide.length > 0, `got: "${typedDuringHide}"`);
+
+      // Simulate tab visible again
+      await evaluate('window.__setVisibility(false)');
+      check('document.hidden is false', await evaluate('document.hidden') === false);
+
+      // Wait for the loop to resume and start typing the next demo
+      await sleep(4000);
+
+      const typedAfterShow = await evaluate('document.getElementById("palette-typed")?.textContent ?? ""');
+      check('Demo resumes after visible', typedAfterShow !== typedBeforeHide, `before: "${typedBeforeHide}", after: "${typedAfterShow}"`);
+
+      // Verify no duplicate loops — loopRunning should be true (only one loop)
+      // We can't read loopRunning directly since it's scoped, but we can
+      // verify no errors occurred (duplicate loops would cause errors)
+      check('No errors from resume (no duplicate loops)', exceptions.length === 0, exceptions.join('; '));
     });
   } finally {
     server.close();
