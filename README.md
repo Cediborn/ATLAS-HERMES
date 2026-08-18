@@ -24,7 +24,7 @@ python3 -m http.server 8000
 /app/index.html       Atlas application shell (sidebar, topbar, dashboard, command palette)
 /css                  tokens → base → components → app-shell/dashboard/landing + module styles
 /js                   one ES module per responsibility (see below)
-/assets               favicon / logo mark
+/assets               favicon / logo mark (SVG + PWA icon PNGs)
 /tests                Headless-Chrome test harness (persistence round-trip + UI e2e)
 ```
 

@@ -365,3 +365,14 @@ README and deliberately kept as the `db.js`/`persistence.js` seam.
 - Verified: `tests/luna-close-repro.mjs` (load → hidden, FAB click → open,
   X click → closed with `display: none`) + full `tests/luna-landing-driver.mjs`
   (14/14).
+
+### 1.10 — New logo
+
+Replaced the original blue rounded-square "A" monogram with the gold nested-triangle mark (thin outline → dark gap → thick band → dark gap → solid core, #E6C66D on #1E1E1E) across every surface that carries the brand:
+
+- `assets/favicon.svg` — the single source of truth (favicon in both apps, landing nav logo, manifest icon, browser-notification icon all point here)
+- `assets/icon-192.png`, `assets/icon-512.png`, `assets/apple-touch-icon.png` — generated from the SVG via headless Chrome (no image toolchain), added to the manifest for installability and linked as apple-touch-icon on both pages
+- `app/sw.js` cache bumped to `atlas-v3` so clients drop the stale cached favicon
+- Sidebar footer badge updated from the stale "Phase 0" to "Atlas · Local-first"
+
+Verified with `tests/verify-logo.mjs` (canvas pixel-sampling confirms the gold-on-dark layer structure) and `tests/logo-driver.mjs` (landing renders the gold mark, manifest/PNGs serve, app boots clean) — 12/12 checks.
