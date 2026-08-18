@@ -372,7 +372,8 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-20);
-  background: var(--color-bg);
+  /* Gold brand moment — matches the PWA native splash (manifest background_color) */
+  background: var(--color-accent-solid);
   transition: opacity var(--duration-panel) var(--ease-atlas);
 }
 .splash.is-leaving { opacity: 0; pointer-events: none; }
@@ -380,6 +381,7 @@
   width: 72px;
   height: 72px;
   animation: splash-float 2s ease-in-out infinite;
+  filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.28));
 }
 @keyframes splash-float {
   0%, 100% { transform: translateY(0); }
@@ -389,5 +391,5 @@
   font-size: var(--text-xl);
   font-weight: var(--weight-semibold);
   letter-spacing: -0.01em;
-  color: var(--color-text);
+  color: var(--color-on-accent);
 }

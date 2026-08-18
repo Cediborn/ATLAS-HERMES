@@ -6,12 +6,17 @@
 // Usage: node tests/gold-driver.mjs [base-url]
 
 import { spawn } from 'node:child_process';
+import { rmSync } from 'node:fs';
 
 const BASE = process.argv[2] || 'http://127.0.0.1:8123';
 const CHROME = process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const PORT = 9447;
 const PROFILE = '/tmp/atlas-gold-driver-profile';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Fresh profile every run — a reused one lets the service worker serve
+// stale cached CSS and produce false failures after a deploy.
+rmSync(PROFILE, { recursive: true, force: true });
 
 const checks = [];
 function check(name, ok, detail = '') {
@@ -74,6 +79,26 @@ try {
   await send('Runtime.enable');
   await send('Page.enable');
   await send('Page.navigate', { url: `${BASE}/app/index.html` });
+
+  // Splash branding: gold background + dark wordmark, matching the PWA splash.
+  // Wait until the stylesheet applies (app-shell.css holds the splash rules) —
+  // on a fresh profile it loads a beat after first paint. The splash stays
+  // visible for seconds while IndexedDB seeds, so there's no race with removal.
+  const settleStart = Date.now();
+  while (Date.now() - settleStart < 12000) {
+    const bg = await evaluate(`(() => { const s = document.getElementById('splash'); return s ? getComputedStyle(s).backgroundColor : 'gone'; })()`);
+    if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'gone') break;
+    await sleep(100);
+  }
+  const splashBrand = await evaluate(`(() => {
+    const s = document.getElementById('splash');
+    if (!s) return null;
+    const cs = getComputedStyle(s);
+    const wm = s.querySelector('.splash__wordmark');
+    return { bg: cs.backgroundColor, wm: wm ? getComputedStyle(wm).color : null };
+  })()`);
+  check('splash background is gold', splashBrand?.bg === 'rgb(230, 198, 109)', splashBrand?.bg || 'no splash');
+  check('splash wordmark is dark on gold', splashBrand?.wm === 'rgb(20, 21, 26)', splashBrand?.wm || '');
 
   // Wait for the app to actually boot: LUNA FAB present (JS loaded) and the
   // dashboard rendered (data layer hydrated + first paint).

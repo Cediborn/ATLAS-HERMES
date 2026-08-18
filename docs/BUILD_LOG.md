@@ -399,3 +399,9 @@ Verified with `tests/statglow-driver.mjs` — computed-style checks plus real sc
 - **Browser notifications** (`js/browser-notifications.js`): switched the notification icon from the SVG favicon (unreliable in system notifications) to the gold-branded `icon-192.png`, and added `assets/badge.png` — a 96px transparent-background monochrome silhouette of the gold triangle mark for Android's status-bar badge. `tests/gen-icons.mjs` now exports icons via in-page canvas `toDataURL` so transparent backgrounds survive (screenshot capture forced an opaque background — caught by the pwa-gold driver's corner-alpha check).
 
 Verified with `tests/pwa-gold-driver.mjs` — manifest/meta gold, badge PNG valid with transparent corners + opaque mark, notification refs, clean boot. 11/11, plus logo 12/12, gold 12/12, routes 11/11 regressions.
+
+### 1.14 — Gold in-app splash
+
+The in-app splash now matches the PWA native splash: gold background (`var(--color-accent-solid)`, the same `#E6C66D` as the manifest `background_color`), dark wordmark (`--color-on-accent`) for contrast, and a soft drop shadow under the dark-tile logo so it lifts off the gold. Boot is now one continuous gold brand moment → dark app.
+
+Verified: gold-driver extended to poll for the splash's settled computed style — gold bg `rgb(230,198,109)` + dark wordmark `rgb(20,21,26)`. 14/14, plus routes 11/11, statglow 10/10, pwa-gold 11/11 regressions. (Also made gold-driver use a fresh profile — a reused one let the service worker serve stale cached CSS and produce false failures.)
