@@ -1,6 +1,9 @@
 // Atlas — Sidebar component.
 // Renders nav from config, and owns every sidebar-only interaction:
 // mobile drawer, desktop icon-rail collapse, workspace switcher.
+//
+// Navigation items are grouped (Plan/Learn/Capture/Life) per the consolidated
+// information architecture. Books and Coding are removed as standalone entries.
 
 import { icon } from './icons.js';
 import { getState, setState } from './store.js';
@@ -16,16 +19,30 @@ const LOGO_SVG =
 
 export function renderNav(navItems) {
   const nav = document.getElementById('sidebar-nav');
-  nav.innerHTML = navItems
-    .map(
-      (item) => `
-      <a href="#/${item.id}" class="nav-link" data-route="${item.id}" title="${item.label}">
-        ${icon(item.icon, { size: 19 })}
-        <span class="nav-link__label">${item.label}</span>
-        ${item.phase ? `<span class="nav-link__phase">P${item.phase}</span>` : ''}
-      </a>`
-    )
-    .join('');
+  let html = '';
+  let lastGroup = null;
+
+  for (const item of navItems) {
+    // Render group label when the group changes (except for ungrouped items)
+    if (item.group && item.group !== lastGroup) {
+      lastGroup = item.group;
+      html += `<li class="nav-group__label" aria-hidden="true">${item.group}</li>`;
+    } else if (!item.group) {
+      // When moving from grouped to ungrouped (e.g. Dashboard), reset
+      lastGroup = null;
+    }
+
+    html += `
+      <li>
+        <a href="#/${item.id}" class="nav-link" data-route="${item.id}" title="${item.label}">
+          ${icon(item.icon, { size: 19 })}
+          <span class="nav-link__label">${item.label}</span>
+          ${item.phase ? `<span class="nav-link__phase">P${item.phase}</span>` : ''}
+        </a>
+      </li>`;
+  }
+
+  nav.innerHTML = html;
 }
 
 export function setActiveRoute(routeId) {

@@ -11,18 +11,21 @@ export const workspaces = [
 ];
 
 // Single source of truth for sidebar + router + empty states.
+// Books and Coding have been absorbed into Learning and Projects respectively.
+// Sidebar items are grouped into conceptual sections: PLAN / LEARN / CAPTURE / LIFE.
 export const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: 'grid' },
-  { id: 'projects', label: 'Projects', icon: 'folder' },
-  { id: 'calendar', label: 'Calendar', icon: 'calendar' },
-  { id: 'notes', label: 'Notes', icon: 'fileText' },
-  { id: 'habits', label: 'Habits', icon: 'flame' },
-  { id: 'goals', label: 'Goals', icon: 'target' },
-  { id: 'learning', label: 'Learning', icon: 'bookOpen' },
-  { id: 'finance', label: 'Finance', icon: 'wallet' },
-  { id: 'books', label: 'Books', icon: 'book' },
-  { id: 'coding', label: 'Coding', icon: 'code' },
-  { id: 'settings', label: 'Settings', icon: 'settings' },
+  // PLAN
+  { id: 'calendar', label: 'Calendar', icon: 'calendar', group: 'Plan' },
+  { id: 'projects', label: 'Projects', icon: 'folder', group: 'Plan' },
+  { id: 'goals', label: 'Goals', icon: 'target', group: 'Plan' },
+  // LEARN
+  { id: 'learning', label: 'Learning', icon: 'bookOpen', group: 'Learn' },
+  // CAPTURE
+  { id: 'notes', label: 'Notes', icon: 'fileText', group: 'Capture' },
+  // LIFE
+  { id: 'habits', label: 'Habits', icon: 'flame', group: 'Life' },
+  { id: 'finance', label: 'Finance', icon: 'wallet', group: 'Life' },
 ];
 
 export const quickActions = [

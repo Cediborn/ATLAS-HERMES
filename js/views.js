@@ -18,10 +18,7 @@ import { resources as allResources } from './learning/data.js';
 import { computeResourceProgress } from './learning/state.js';
 import { transactions as allTransactions, accounts as allAccounts, CATEGORY_CONFIG } from './finance/data.js';
 import { formatCurrency as formatMoney } from './finance/state.js';
-import { books as allBooks } from './books/data.js';
-import { computeBookProgress } from './books/state.js';
-import { codingItems as allCoding } from './coding/data.js';
-import { computeItemProgress } from './coding/state.js';
+
 import { computeDashboardStats, computeStreak, computeSuccessRate, dayState, topStreaks, computeTrend, setCompletionStatus } from './habits/state.js';
 import { getEventsInRange } from './calendar/repository.js';
 import { calendar as getCalendarInfo } from './calendar/data.js';
@@ -37,8 +34,6 @@ import {
   ProjectItem,
   GoalItem,
   ResourceItem,
-  BookItem,
-  CodingItem,
   TransactionItem,
   NoteItem,
   HabitItem,
@@ -234,44 +229,7 @@ export function renderDashboard(container) {
         .join('')
     : emptyState({ icon: 'wallet', title: 'No transactions yet', description: 'Add an income or expense.', size: 'sm' });
 
-  const readingBooks = allBooks
-    .filter((b) => b.status === 'Reading')
-    .sort((a, b) => computeBookProgress(b) - computeBookProgress(a))
-    .slice(0, 3);
 
-  const booksBody = readingBooks.length
-    ? readingBooks
-        .map((b) =>
-          BookItem({
-            id: b.id,
-            title: b.title,
-            author: b.author,
-            progress: computeBookProgress(b),
-            status: b.status,
-          })
-        )
-        .join('')
-    : emptyState({ icon: 'book', title: 'Nothing on the go', description: 'Start reading a book.', size: 'sm' });
-
-  const activeCoding = allCoding
-    .filter((c) => c.status === 'In Progress')
-    .sort((a, b) => computeItemProgress(b) - computeItemProgress(a))
-    .slice(0, 3);
-
-  const codingBody = activeCoding.length
-    ? activeCoding
-        .map((c) =>
-          CodingItem({
-            id: c.id,
-            title: c.title,
-            kind: c.kind,
-            progress: computeItemProgress(c),
-            status: c.status,
-            time: c.stepsTotal > 0 ? `${c.stepsDone}/${c.stepsTotal} steps` : `${c.timeSpentMin} min`,
-          })
-        )
-        .join('')
-    : emptyState({ icon: 'code', title: 'Nothing in the queue', description: 'Pick up a problem or build.', size: 'sm' });
 
   const welcome = !localStorage.getItem('atlas:welcomeSeen')
     ? `<div class="welcome-banner" role="status">
@@ -306,8 +264,6 @@ export function renderDashboard(container) {
           ${SectionCard({ title: 'Upcoming Events', action: sectionAction('calendar'), content: eventsBody })}
           ${SectionCard({ title: 'Current Streaks', action: sectionAction('habits'), content: habitsBody })}
           ${SectionCard({ title: 'Finance', action: sectionAction('finance'), content: financeBody })}
-          ${SectionCard({ title: 'Currently Reading', action: sectionAction('books'), content: booksBody })}
-          ${SectionCard({ title: 'Coding', action: sectionAction('coding'), content: codingBody })}
           ${SectionCard({ title: 'Learning Progress', action: sectionAction('learning'), content: learningBody })}
         </div>
       </div>

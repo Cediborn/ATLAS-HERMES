@@ -1,8 +1,10 @@
 // Atlas — Command palette. The "spine of the app" (Foundation §8): one
 // surface for search, actions, and navigation, opened via ⌘K or the topbar
 // search pill. Besides nav/actions it now searches real user content across
-// every module (projects, tasks, notes, events, goals, books, learning,
+// every module (projects, tasks, notes, events, goals, learning,
 // habits) and offers real create commands for each module.
+// Books and Coding have been removed as standalone search targets — their
+// content now lives in Learning and Projects.
 
 import { icon } from './icons.js';
 
@@ -33,14 +35,10 @@ function contentResults(q) {
   for (const e of eventsList()) push('Calendar', 'calendar', e.title, 'calendar');
   // Goals
   for (const g of goalsList()) push('Goals', 'target', g.title, 'goals');
-  // Books
-  for (const b of booksList()) push('Books', 'book', `${b.title} — ${b.author}`, 'books');
-  // Learning resources
+  // Learning resources (includes books)
   for (const r of resourcesList()) push('Learning', 'bookOpen', r.title, 'learning');
   // Habits
   for (const h of habitsList()) push('Habits', 'flame', h.title, 'habits');
-  // Coding items
-  for (const c of codingList()) push('Coding', 'code', c.title, 'coding');
 
   return out;
 }
@@ -50,10 +48,8 @@ function projectsList() { return import('./projects/data.js').then((m) => m.proj
 function notesList() { return import('./notes/data.js').then((m) => m.notes); }
 function eventsList() { return import('./calendar/data.js').then((m) => m.events); }
 function goalsList() { return import('./goals/data.js').then((m) => m.goals); }
-function booksList() { return import('./books/data.js').then((m) => m.books); }
 function resourcesList() { return import('./learning/data.js').then((m) => m.resources); }
 function habitsList() { return import('./habits/data.js').then((m) => m.habits); }
-function codingList() { return import('./coding/data.js').then((m) => m.codingItems); }
 
 // ---- Real create commands (each opens the module's actual create dialog) ----
 const CREATE_COMMANDS = [
@@ -72,8 +68,6 @@ const CREATE_COMMANDS = [
   { id: 'create-goal', label: 'New Goal', iconName: 'target', open: () => import('./goals/dialog.js').then((m) => m.openGoalDialog('create', null, () => {})) },
   { id: 'create-resource', label: 'Add Learning Resource', iconName: 'bookOpen', open: () => import('./learning/dialog.js').then((m) => m.openResourceDialog('create', null, () => {})) },
   { id: 'create-transaction', label: 'New Transaction', iconName: 'wallet', open: () => import('./finance/dialog.js').then((m) => m.openTransactionDialog('create', null, () => {})) },
-  { id: 'create-book', label: 'New Book', iconName: 'book', open: () => import('./books/dialog.js').then((m) => m.openBookDialog('create', null, () => {})) },
-  { id: 'create-coding', label: 'New Coding Item', iconName: 'code', open: () => import('./coding/dialog.js').then((m) => m.openCodingDialog('create', null, () => {})) },
 ];
 
 let onNavigate = () => {};

@@ -1,6 +1,9 @@
 // Atlas — Hash router. Hash-based on purpose: a path-based router would 404
 // on hard refresh under GitHub Pages' static hosting without extra server
 // config; `#/route` resolves entirely client-side, so it just works.
+//
+// Books and Coding have been removed as standalone routes — their functionality
+// is now part of Learning (books as resource type, coding as learning topics).
 
 import { navItems } from './config.js';
 import { renderDashboard, renderEmptyState, renderSettings } from './views.js';
@@ -57,16 +60,6 @@ function render(routeId) {
     import('./finance/view.js').then(({ renderFinance, renderFinanceSkeleton }) => {
       renderFinanceSkeleton(root);
       renderFinance(root);
-    });
-  } else if (item.id === 'books') {
-    import('./books/view.js').then(({ renderBooks, renderBooksSkeleton }) => {
-      renderBooksSkeleton(root);
-      renderBooks(root);
-    });
-  } else if (item.id === 'coding') {
-    import('./coding/view.js').then(({ renderCoding, renderCodingSkeleton }) => {
-      renderCodingSkeleton(root);
-      renderCoding(root);
     });
   } else {
     renderEmptyState(root, item);
