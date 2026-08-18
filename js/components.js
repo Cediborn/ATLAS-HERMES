@@ -4,6 +4,7 @@
 // component (same prop shape) when Atlas moves to Next.js (Foundation §4).
 
 import { icon } from './icons.js';
+import { esc } from './sanitize.js';
 
 // ---- Badge --------------------------------------------------------------
 // Maps common status words to a semantic color automatically; pass `variant`
@@ -26,7 +27,7 @@ const BADGE_VARIANT_MAP = {
 
 export function Badge({ label, variant }) {
   const resolved = variant || BADGE_VARIANT_MAP[String(label).toLowerCase()] || 'neutral';
-  return `<span class="badge badge--${resolved}">${label}</span>`;
+  return `<span class="badge badge--${resolved}">${esc(label)}</span>`;
 }
 
 // ---- Progress -------------------------------------------------------------
@@ -34,7 +35,7 @@ export function Progress({ percentage, label, color = 'accent' }) {
   const pct = Math.max(0, Math.min(100, percentage));
   return `
     <div class="progress-component">
-      ${label ? `<div class="progress-component__label"><span>${label}</span><span>${pct}%</span></div>` : ''}
+      ${label ? `<div class="progress-component__label"><span>${esc(label)}</span><span>${pct}%</span></div>` : ''}
       <div class="progress progress--${color}"><div class="progress__fill" style="width:${pct}%"></div></div>
     </div>`;
 }
@@ -57,7 +58,7 @@ export function ProgressRing({ percentage, label, color = 'accent', size = 44, s
           transform="rotate(-90 ${size / 2} ${size / 2})" />
         ${showValue && size >= 32 ? `<text x="50%" y="51%" text-anchor="middle" dominant-baseline="middle" class="progress-ring__label">${pct}</text>` : ''}
       </svg>
-      ${label ? `<span class="progress-ring-component__label">${label}</span>` : ''}
+      ${label ? `<span class="progress-ring-component__label">${esc(label)}</span>` : ''}
     </div>`;
 }
 
@@ -67,8 +68,8 @@ export function emptyState({ icon: iconName, title, description, size = 'md', ba
   return `
     <div class="empty-state${sizeClass}">
       <span class="empty-state__icon">${icon(iconName, { size: size === 'sm' ? 20 : 26 })}</span>
-      <h2>${title}</h2>
-      ${description ? `<p>${description}</p>` : ''}
+      <h2>${esc(title)}</h2>
+      ${description ? `<p>${esc(description)}</p>` : ''}
       ${badge || ''}
     </div>`;
 }
@@ -80,10 +81,10 @@ export function StatCard({ title, value, icon: iconName, trend, accent }) {
     <div class="stat-card${accentClass}">
       <div class="stat-card__top">
         <span class="stat-card__icon">${icon(iconName, { size: 17 })}</span>
-        ${trend ? `<span class="stat-card__trend">${trend}</span>` : ''}
+        ${trend ? `<span class="stat-card__trend">${esc(trend)}</span>` : ''}
       </div>
-      <span class="stat-card__value">${value}</span>
-      <span class="stat-card__label">${title}</span>
+      <span class="stat-card__value">${esc(value)}</span>
+      <span class="stat-card__label">${esc(title)}</span>
     </div>`;
 }
 
@@ -93,8 +94,8 @@ export function SectionCard({ title, description, action, content }) {
     <section class="section-card">
       <header class="section-card__header">
         <div class="section-card__heading">
-          <h3>${title}</h3>
-          ${description ? `<p class="section-card__desc">${description}</p>` : ''}
+          <h3>${esc(title)}</h3>
+          ${description ? `<p class="section-card__desc">${esc(description)}</p>` : ''}
         </div>
         ${action || ''}
       </header>
@@ -109,15 +110,15 @@ export function sectionAction(routeId, label = 'View all') {
 // ---- Quick Action Button ------------------------------------------------
 export function QuickActionButton({ icon: iconName, label, id }) {
   return `
-    <button type="button" class="quick-action" data-action="${id}">
+    <button type="button" class="quick-action" data-action="${esc(id)}">
       <span class="quick-action__icon">${icon(iconName, { size: 18 })}</span>
-      <span class="quick-action__label">${label}</span>
+      <span class="quick-action__label">${esc(label)}</span>
     </button>`;
 }
 
 // ---- Tag — a generic clickable pill, shared by Projects and Notes ----
 export function Tag({ label, active = false }) {
-  return `<button type="button" class="tag-chip${active ? ' is-active' : ''}" data-tag="${label}">${label}</button>`;
+  return `<button type="button" class="tag-chip${active ? ' is-active' : ''}" data-tag="${esc(label)}">${esc(label)}</button>`;
 }
 
 // ---- ActionMenu — favorite/pin/archive quick actions, shared by Projects
@@ -125,7 +126,7 @@ export function Tag({ label, active = false }) {
 export function ActionMenu({ id, itemLabel, favorite, pinned, archived }) {
   return `
     <div class="action-menu">
-      <button type="button" class="icon-btn action-menu__trigger" data-id="${id}" aria-label="Actions for ${itemLabel}" aria-haspopup="true" aria-expanded="false">
+      <button type="button" class="icon-btn action-menu__trigger" data-id="${esc(id)}" aria-label="Actions for ${esc(itemLabel)}" aria-haspopup="true" aria-expanded="false">
         ${icon('moreHorizontal', { size: 16 })}
       </button>
       <div class="menu action-menu__panel" hidden>
@@ -141,14 +142,14 @@ export function ActionMenu({ id, itemLabel, favorite, pinned, archived }) {
 
 export function TaskItem({ id, title, category, priority, dueTime, done }) {
   return `
-    <div class="task-item${done ? ' is-done' : ''}" data-id="${id}" role="checkbox" aria-checked="${done}" aria-label="${title}" tabindex="0">
+    <div class="task-item${done ? ' is-done' : ''}" data-id="${esc(id)}" role="checkbox" aria-checked="${done}" aria-label="${esc(title)}" tabindex="0">
       <span class="task-item__check">${icon('check', { size: 11 })}</span>
       <span class="task-item__body">
-        <span class="task-item__title">${title}</span>
+        <span class="task-item__title">${esc(title)}</span>
         <span class="task-item__meta">
-          ${priority ? `<span class="task-item__priority task-item__priority--${priority}" title="${priority} priority"></span>` : ''}
-          <span>${category}</span>
-          ${dueTime ? `<span class="task-item__due">${dueTime}</span>` : ''}
+          ${priority ? `<span class="task-item__priority task-item__priority--${priority}" title="${esc(priority)} priority"></span>` : ''}
+          <span>${esc(category)}</span>
+          ${dueTime ? `<span class="task-item__due">${esc(dueTime)}</span>` : ''}
         </span>
       </span>
     </div>`;
@@ -156,95 +157,95 @@ export function TaskItem({ id, title, category, priority, dueTime, done }) {
 
 export function EventItem({ id, time, title, location, color = 'accent' }) {
   return `
-    <div class="event-item" data-id="${id}">
+    <div class="event-item" data-id="${esc(id)}">
       <span class="event-item__color event-item__color--${color}" aria-hidden="true"></span>
-      <span class="event-item__time">${time}</span>
+      <span class="event-item__time">${esc(time)}</span>
       <span class="event-item__body">
-        <span class="event-item__title">${title}</span>
-        ${location ? `<span class="event-item__location">${location}</span>` : ''}
+        <span class="event-item__title">${esc(title)}</span>
+        ${location ? `<span class="event-item__location">${esc(location)}</span>` : ''}
       </span>
     </div>`;
 }
 
 export function ProjectItem({ id, name, status, lastUpdated, progress }) {
   return `
-    <div class="project-item" data-id="${id}">
+    <div class="project-item" data-id="${esc(id)}">
       <div class="project-item__top">
-        <span class="project-item__title">${name}</span>
+        <span class="project-item__title">${esc(name)}</span>
         ${Badge({ label: status })}
       </div>
-      <div class="project-item__meta">Updated ${lastUpdated}</div>
+      <div class="project-item__meta">Updated ${esc(lastUpdated)}</div>
       ${typeof progress === 'number' ? Progress({ percentage: progress }) : ''}
     </div>`;
 }
 
 export function GoalItem({ id, title, progress, status, deadline }) {
   return `
-    <div class="goal-item" data-id="${id}">
+    <div class="goal-item" data-id="${esc(id)}">
       <div class="goal-item__top">
-        <span class="goal-item__title">${title}</span>
+        <span class="goal-item__title">${esc(title)}</span>
         ${Badge({ label: status })}
       </div>
-      <div class="goal-item__meta">${deadline ? `Deadline ${deadline}` : 'No deadline set'}</div>
+      <div class="goal-item__meta">${deadline ? `Deadline ${esc(deadline)}` : 'No deadline set'}</div>
       ${typeof progress === 'number' ? Progress({ percentage: progress, color: 'accent' }) : ''}
     </div>`;
 }
 
 export function ResourceItem({ id, title, typeLabel, progress, status }) {
   return `
-    <div class="resource-item" data-id="${id}">
+    <div class="resource-item" data-id="${esc(id)}">
       <div class="resource-item__top">
-        <span class="resource-item__title">${title}</span>
+        <span class="resource-item__title">${esc(title)}</span>
         ${Badge({ label: status })}
       </div>
-      <div class="resource-item__meta">${typeLabel}</div>
+      <div class="resource-item__meta">${esc(typeLabel)}</div>
       ${typeof progress === 'number' ? Progress({ percentage: progress, color: 'accent' }) : ''}
     </div>`;
 }
 
 export function BookItem({ id, title, author, progress, status }) {
   return `
-    <div class="book-item" data-id="${id}">
+    <div class="book-item" data-id="${esc(id)}">
       <div class="book-item__top">
-        <span class="book-item__title">${title}</span>
+        <span class="book-item__title">${esc(title)}</span>
         ${Badge({ label: status })}
       </div>
-      <div class="book-item__meta">${author}</div>
+      <div class="book-item__meta">${esc(author)}</div>
       ${typeof progress === 'number' ? Progress({ percentage: progress, color: 'accent' }) : ''}
     </div>`;
 }
 
 export function TransactionItem({ id, title, category, amount, type, icon: iconName = 'wallet', account }) {
   return `
-    <div class="transaction-item" data-id="${id}">
+    <div class="transaction-item" data-id="${esc(id)}">
       <span class="transaction-item__icon">${icon(iconName, { size: 17 })}</span>
       <span class="transaction-item__body">
-        <span class="transaction-item__title">${title}</span>
-        <span class="transaction-item__meta">${account ? `${account} · ` : ''}${category}</span>
+        <span class="transaction-item__title">${esc(title)}</span>
+        <span class="transaction-item__meta">${account ? `${esc(account)} · ` : ''}${esc(category)}</span>
       </span>
-      <span class="transaction-item__amount transaction-item__amount--${type}">${type === 'income' ? '+' : '\u2212'}${amount}</span>
+      <span class="transaction-item__amount transaction-item__amount--${type}">${type === 'income' ? '+' : '\u2212'}${esc(amount)}</span>
     </div>`;
 }
 
 export function CodingItem({ id, title, kind, progress, status, time }) {
   return `
-    <div class="coding-item" data-id="${id}">
+    <div class="coding-item" data-id="${esc(id)}">
       <div class="coding-item__top">
-        <span class="coding-item__title">${title}</span>
+        <span class="coding-item__title">${esc(title)}</span>
         ${Badge({ label: status })}
       </div>
-      <div class="coding-item__meta">${kind === 'build' ? 'Build' : 'Problem'} · ${time}</div>
+      <div class="coding-item__meta">${kind === 'build' ? 'Build' : 'Problem'} · ${esc(time)}</div>
       ${typeof progress === 'number' ? Progress({ percentage: progress, color: 'accent' }) : ''}
     </div>`;
 }
 
 export function NoteItem({ id, title, editedDate, tag }) {
   return `
-    <div class="note-item" data-id="${id}">
+    <div class="note-item" data-id="${esc(id)}">
       <span class="note-item__file-icon">${icon('fileText', { size: 17 })}</span>
       <span class="note-item__body">
-        <span class="note-item__title">${title}</span>
-        <span class="note-item__meta">${editedDate}</span>
+        <span class="note-item__title">${esc(title)}</span>
+        <span class="note-item__meta">${esc(editedDate)}</span>
       </span>
       ${tag ? Badge({ label: tag, variant: 'neutral' }) : ''}
     </div>`;
@@ -253,16 +254,16 @@ export function NoteItem({ id, title, editedDate, tag }) {
 export function HabitItem({ id, name, icon: iconName = 'flame', streak, completedToday, weeklyProgress }) {
   const hasCheck = typeof completedToday === 'boolean';
   return `
-    <div class="habit-item" data-id="${id}">
+    <div class="habit-item" data-id="${esc(id)}">
       <span class="habit-item__icon">${icon(iconName, { size: 17 })}</span>
       <span class="habit-item__body">
-        <span class="habit-item__title">${name}</span>
-        <span class="habit-item__meta">${streak}</span>
+        <span class="habit-item__title">${esc(name)}</span>
+        <span class="habit-item__meta">${esc(streak)}</span>
         ${typeof weeklyProgress === 'number' ? Progress({ percentage: weeklyProgress, color: 'warning' }) : ''}
       </span>
       ${
         hasCheck
-          ? `<button type="button" class="habit-item__check${completedToday ? ' is-done' : ''}" role="checkbox" aria-checked="${completedToday}" aria-label="Mark ${name} done today">
+          ? `<button type="button" class="habit-item__check${completedToday ? ' is-done' : ''}" role="checkbox" aria-checked="${completedToday}" aria-label="Mark ${esc(name)} done today">
               ${icon('check', { size: 12 })}
             </button>`
           : ''

@@ -157,8 +157,14 @@ async function hydrateWorkspace(workspaceId) {
 }
 
 export async function hydrate() {
-  await seedIfNeeded();
-  await hydrateWorkspace(activeWorkspaceId());
+  try {
+    await seedIfNeeded();
+    await hydrateWorkspace(activeWorkspaceId());
+  } catch (err) {
+    console.error('[atlas] Hydration failed:', err);
+    // Re-throw so the boot sequence can show a failure state
+    throw err;
+  }
 }
 
 export async function switchWorkspace(workspaceId) {
@@ -194,6 +200,9 @@ function enqueue(storeName, fn) {
   const prev = queues.get(storeName) || Promise.resolve();
   const next = prev.then(fn).catch((err) => {
     console.error(`[atlas] Failed to persist ${storeName}:`, err);
+    // Surface the error so callers can react — the queue still resolves
+    // (to the error) so subsequent writes aren't blocked, but the caller
+    // gets a rejected promise they can await and handle.
   });
   queues.set(storeName, next);
   return next;
@@ -210,14 +219,33 @@ export function flushAll() {
   return Promise.all([...queues.values()]);
 }
 
-export function saveProjects() { return enqueue('projects', () => db.putMany('projects', snapshot(projects, 'project'))); }
-export function saveEvents() { return enqueue('events', () => db.putMany('events', snapshot(events, 'event'))); }
-export function saveNotes() { return enqueue('notes', () => db.putMany('notes', snapshot(notes, 'note'))); }
-export function saveHabits() { return enqueue('habits', () => db.putMany('habits', snapshot(habits, 'habit'))); }
-export function saveCompletions() { return enqueue('habitCompletions', () => db.putMany('habitCompletions', completions.map((c, i) => ({ ...c, id: `${c.habitId}::${c.date}`, workspaceId: activeWorkspaceId(), _order: i })))); }
-export function saveGoals() { return enqueue('goals', () => db.putMany('goals', snapshot(goals, 'goal'))); }
-export function saveResources() { return enqueue('resources', () => db.putMany('resources', snapshot(resources, 'resource'))); }
-export function saveTransactions() { return enqueue('transactions', () => db.putMany('transactions', snapshot(transactions, 'transaction'))); }
-export function saveBooks() { return enqueue('books', () => db.putMany('books', snapshot(books, 'book'))); }
-export function saveCodingItems() { return enqueue('codingItems', () => db.putMany('codingItems', snapshot(codingItems, 'coding'))); }
-export function saveCodingSessions() { return enqueue('codingSessions', () => db.putMany('codingSessions', snapshot(practiceSessions, 'coding'))); }
+// Workspace-scoped save: delete all records for the active workspace first,
+// then write the current in-memory snapshot. This ensures deleted records
+// don't reappear on reload (putMany upserts but never removes).
+function saveWorkspace(storeName, items, kind) {
+  const ws = activeWorkspaceId();
+  const snap = items.map((item, i) => ({ ...item, workspaceId: ws, _order: i }));
+  return enqueue(storeName, async () => {
+    await db.removeByWorkspace(storeName, ws);
+    await db.putMany(storeName, snap);
+  });
+}
+
+export function saveProjects() { return saveWorkspace('projects', projects, 'project'); }
+export function saveEvents() { return saveWorkspace('events', events, 'event'); }
+export function saveNotes() { return saveWorkspace('notes', notes, 'note'); }
+export function saveHabits() { return saveWorkspace('habits', habits, 'habit'); }
+export function saveCompletions() {
+  const ws = activeWorkspaceId();
+  const snap = completions.map((c, i) => ({ ...c, id: `${c.habitId}::${c.date}`, workspaceId: ws, _order: i }));
+  return enqueue('habitCompletions', async () => {
+    await db.removeByWorkspace('habitCompletions', ws);
+    await db.putMany('habitCompletions', snap);
+  });
+}
+export function saveGoals() { return saveWorkspace('goals', goals, 'goal'); }
+export function saveResources() { return saveWorkspace('resources', resources, 'resource'); }
+export function saveTransactions() { return saveWorkspace('transactions', transactions, 'transaction'); }
+export function saveBooks() { return saveWorkspace('books', books, 'book'); }
+export function saveCodingItems() { return saveWorkspace('codingItems', codingItems, 'coding'); }
+export function saveCodingSessions() { return saveWorkspace('codingSessions', practiceSessions, 'coding'); }

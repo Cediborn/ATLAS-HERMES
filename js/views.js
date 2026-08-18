@@ -26,6 +26,7 @@ import { computeDashboardStats, computeStreak, computeSuccessRate, dayState, top
 import { getEventsInRange } from './calendar/repository.js';
 import { calendar as getCalendarInfo } from './calendar/data.js';
 import { formatTime } from './calendar/state.js';
+import { esc } from './sanitize.js';
 import {
   StatCard,
   SectionCard,
@@ -283,7 +284,7 @@ export function renderDashboard(container) {
     <div class="dashboard">
       ${welcome}
       <div class="dashboard__hero">
-        <h2>${greeting}, ${firstName}.</h2>
+        <h2>${greeting}, ${esc(firstName)}.</h2>
         <p class="dashboard__hero-date">${dateStr}</p>
         <p class="dashboard__hero-subtitle">Let's make today count.</p>
       </div>
@@ -390,8 +391,8 @@ export function renderSettings(container) {
   const profile = getProfile();
 
   const profileContent = `
-    <div class="field"><label for="set-name">Name</label><input id="set-name" type="text" value="${profile.name}"></div>
-    <div class="field"><label for="set-email">Email</label><input id="set-email" type="email" value="${profile.email}"></div>
+    <div class="field"><label for="set-name">Name</label><input id="set-name" type="text" value="${esc(profile.name)}"></div>
+    <div class="field"><label for="set-email">Email</label><input id="set-email" type="email" value="${esc(profile.email)}"></div>
     <div class="settings-row"><button type="button" class="btn btn--primary" id="settings-save-profile">Save profile</button><span class="settings-row__meta" id="settings-profile-status" aria-live="polite"></span></div>
   `;
 
@@ -448,6 +449,20 @@ export function renderSettings(container) {
     <div class="settings-row"><span class="settings-row__body">Close any overlay</span><kbd>Esc</kbd></div>
   `;
 
+  const aboutContent = `
+    <p class="settings-row__desc">Atlas v1.0 — a static, local-first personal operating system. All data stays in your browser. No cloud sync, no account required.</p>
+    <div class="settings-row"><span class="settings-row__body">Storage</span><span class="settings-row__meta">IndexedDB (browser local storage)</span></div>
+    <div class="settings-row"><span class="settings-row__body">Offline</span><span class="settings-row__meta">Full offline support after first visit (service worker)</span></div>
+    <div class="settings-row"><span class="settings-row__body">LUNA</span><span class="settings-row__meta">Local rules-based assistant — reads your data on-device, no AI model</span></div>
+    <div class="settings-row__desc" style="margin-top:var(--space-16);"><strong>Not yet supported:</strong></div>
+    <div class="settings-row"><span class="settings-row__body">Calendar week/day views</span><span class="settings-row__meta">Month and Agenda views available</span></div>
+    <div class="settings-row"><span class="settings-row__body">Project Board/Kanban view</span><span class="settings-row__meta">Grid view available</span></div>
+    <div class="settings-row"><span class="settings-row__body">Import/Export</span><span class="settings-row__meta">Requires file I/O, not yet implemented</span></div>
+    <div class="settings-row"><span class="settings-row__body">Google/Outlook calendar sync</span><span class="settings-row__meta">All data is local-only</span></div>
+    <div class="settings-row"><span class="settings-row__body">Cloud sync / authentication</span><span class="settings-row__meta">Atlas is designed as a local-first app</span></div>
+    <div class="settings-row"><span class="settings-row__body">Custom event recurrence</span><span class="settings-row__meta">Basic recurrence only (weekly, monthly, yearly)</span></div>
+  `;
+
   container.innerHTML = `
     <div class="settings-page">
       ${SectionCard({ title: 'Profile', content: profileContent })}
@@ -456,6 +471,7 @@ export function renderSettings(container) {
       ${SectionCard({ title: 'Workspaces', content: workspacesContent })}
       ${SectionCard({ title: 'Data', content: dataContent })}
       ${SectionCard({ title: 'Keyboard shortcuts', content: shortcutsContent })}
+      ${SectionCard({ title: 'About Atlas', content: aboutContent })}
     </div>
   `;
 

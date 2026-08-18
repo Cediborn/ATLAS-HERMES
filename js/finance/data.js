@@ -28,6 +28,12 @@ export const ACCOUNT_TYPES = Object.keys(ACCOUNT_TYPE_CONFIG);
 // transaction amounts. Uniform rule for every account type: income adds to the
 // balance, expense subtracts. Credit accounts therefore start negative (money
 // owed) and spending makes them more negative — displayed as "owed".
+//
+// NOTE: Accounts are personal-only seed data (not workspace-scoped). They
+// apply across all workspaces. Transactions are workspace-scoped, so
+// balances naturally reflect only the active workspace's transactions.
+// Dashboard balances never mix workspace data because only the current
+// workspace's transactions contribute to the balance math in state.js.
 export const accounts = [
   { id: 'a1', name: 'Everyday Checking', institution: 'Chase', type: 'checking', openingBalance: 3240.5, createdAt: '2026-01-01' },
   { id: 'a2', name: 'High-Yield Savings', institution: 'Marcus', type: 'savings', openingBalance: 12000, createdAt: '2026-01-01' },

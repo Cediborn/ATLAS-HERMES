@@ -108,6 +108,30 @@ export async function remove(storeName, id) {
   return requestToPromise(tx.objectStore(storeName).count());
 }
 
+// Remove every record belonging to a workspace in a single transaction.
+// Used by the write-through layer to ensure deleted records don't reappear
+// on reload (putMany upserts but never deletes).
+export async function removeByWorkspace(storeName, workspaceId) {
+  const db = await openDb();
+  const tx = db.transaction(storeName, 'readwrite');
+  const store = tx.objectStore(storeName);
+  const index = store.index('workspaceId');
+  const range = IDBKeyRange.only(workspaceId);
+  const req = index.openCursor(range);
+  return new Promise((resolve, reject) => {
+    req.onsuccess = () => {
+      const cursor = req.result;
+      if (cursor) {
+        store.delete(cursor.primaryKey);
+        cursor.continue();
+      } else {
+        resolve();
+      }
+    };
+    req.onerror = () => reject(req.error);
+  });
+}
+
 export async function clearStore(storeName) {
   const db = await openDb();
   const tx = db.transaction(storeName, 'readwrite');

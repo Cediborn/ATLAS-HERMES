@@ -28,6 +28,22 @@ function hideSplash() {
   setTimeout(() => splash.remove(), 400);
 }
 
+function showBootFailure(err) {
+  const splash = document.getElementById('splash');
+  if (splash) splash.remove();
+  const root = document.getElementById('view-root') || document.body;
+  root.innerHTML = `
+    <div class="boot-failure" role="alert" style="padding:3rem;text-align:center;max-width:480px;margin:4rem auto;font-family:system-ui,sans-serif;">
+      <h1 style="font-size:1.5rem;margin-bottom:0.5rem;">Atlas couldn’t start</h1>
+      <p style="color:#888;margin-bottom:1rem;">
+        Your browser’s local storage may be unavailable or full.
+        Try clearing site data or using a different browser profile.
+      </p>
+      <pre style="background:#1a1a2e;color:#e0e0e0;padding:1rem;border-radius:6px;text-align:left;overflow:auto;font-size:0.85rem;">${String(err && err.message || err)}</pre>
+      <button onclick="location.reload()" style="margin-top:1rem;padding:0.5rem 1.5rem;border:none;border-radius:6px;background:#E6C66D;color:#0B0C0F;font-weight:600;cursor:pointer;">Retry</button>
+    </div>`;
+}
+
 async function boot() {
   initTheme();
   renderNav(navItems);
@@ -48,7 +64,12 @@ async function boot() {
     onToggleSidebarCollapse: () => document.getElementById('sidebar-collapse-toggle').click(),
   });
 
-  await hydrate();
+  try {
+    await hydrate();
+  } catch (err) {
+    showBootFailure(err);
+    return;
+  }
   initRouter();
   setTimeout(hideSplash, Math.max(0, MIN_SPLASH_MS - (performance.now() - bootStart)));
 

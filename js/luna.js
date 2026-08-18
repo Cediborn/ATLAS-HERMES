@@ -140,7 +140,7 @@ function greetingAnswer() {
     top ? `${top.habit.title} — ${top.streak.current} day streak` : 'no streaks running',
     goal ? `top goal: ${goal.title}` : 'no active goals',
   ];
-  return `<p><strong>${part}!</strong> Quick pulse on Atlas:</p><ul class="luna-list">${bits.map((b) => `<li>${esc(b)}</li>`).join('')}</ul>`;
+  return `<p><strong>${part}!</strong> Quick summary from your data:</p><ul class="luna-list">${bits.map((b) => `<li>${esc(b)}</li>`).join('')}</ul>`;
 }
 
 const HELP_LINES = [
@@ -202,7 +202,7 @@ function mount() {
         <span class="luna-panel__avatar">${icon('sparkle', { size: 15 })}</span>
         <div class="luna-panel__titles">
           <span class="luna-panel__name">LUNA</span>
-          <span class="luna-panel__status">online \u00b7 Atlas assistant</span>
+          <span class="luna-panel__status">local rules-based assistant · no data leaves your device</span>
         </div>
         <button type="button" class="icon-btn luna-panel__min" id="luna-min" aria-label="Minimize LUNA" title="Minimize LUNA">${icon('chevronDown', { size: 17 })}</button>
         <button type="button" class="icon-btn luna-panel__close" id="luna-close" aria-label="Close LUNA">${icon('x', { size: 17 })}</button>

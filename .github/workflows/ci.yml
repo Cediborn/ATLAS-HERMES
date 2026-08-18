@@ -1,0 +1,134 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run security and unit tests
+        run: node tests/test-runner.mjs
+
+      - name: Verify all route modules exist
+        run: |
+          # Ensure every route module referenced by the router is present
+          missing=0
+          for mod in \
+            js/projects/view.js \
+            js/notes/view.js \
+            js/calendar/view.js \
+            js/habits/view.js \
+            js/goals/view.js \
+            js/learning/view.js \
+            js/finance/view.js \
+            js/books/view.js \
+            js/coding/view.js; do
+            if [ ! -f "$mod" ]; then
+              echo "MISSING: $mod"
+              missing=1
+            fi
+          done
+          if [ "$missing" = "1" ]; then
+            echo "Route module verification failed"
+            exit 1
+          fi
+          echo "All route modules present"
+
+      - name: Verify service worker precaches all routes
+        run: |
+          # Check that sw.js SHELL array contains all route modules
+          missing=0
+          for mod in \
+            projects/view.js \
+            notes/view.js \
+            calendar/view.js \
+            habits/view.js \
+            goals/view.js \
+            learning/view.js \
+            finance/view.js \
+            books/view.js \
+            coding/view.js; do
+            if ! grep -q "$mod" app/sw.js; then
+              echo "MISSING from SW precache: $mod"
+              missing=1
+            fi
+          done
+          if [ "$missing" = "1" ]; then
+            echo "Service worker precache verification failed"
+            exit 1
+          fi
+          echo "All routes present in service worker precache"
+
+      - name: Verify no secrets in source
+        run: |
+          # Check for common secret patterns (API keys, tokens, passwords)
+          if grep -rn "API_KEY\|SECRET\|PASSWORD\|api_key\|secret_key\|password" \
+            --include="*.js" --include="*.json" --include="*.yml" \
+            --exclude-dir=node_modules --exclude-dir=.git \
+            --exclude="package.json" \
+            | grep -v "test-runner\|mock-data\|seed\|openBalance\|placeholder" \
+            | grep -v "//" | head -20; then
+            echo "WARNING: Possible secrets found in source"
+          else
+            echo "No secrets detected"
+          fi
+
+      - name: Verify sanitize.js is imported in components
+        run: |
+          if grep -q "from './sanitize.js'" js/components.js; then
+            echo "components.js imports sanitize.js"
+          else
+            echo "FAIL: components.js does not import sanitize.js"
+            exit 1
+          fi
+
+      - name: Verify LUNA labels itself correctly
+        run: |
+          if grep -q "local rules-based assistant" js/luna.js; then
+            echo "LUNA correctly labeled as local assistant"
+          else
+            echo "FAIL: LUNA not labeled correctly"
+            exit 1
+          fi
+
+      - name: Verify markdown blocks unsafe link schemes
+        run: |
+          if grep -q "SAFE_SCHEMES" js/notes/markdown.js; then
+            echo "Markdown link scheme filtering present"
+          else
+            echo "FAIL: Markdown missing safe scheme filtering"
+            exit 1
+          fi
+
+      - name: Verify boot failure state exists
+        run: |
+          if grep -q "showBootFailure" js/main.js; then
+            echo "Boot failure state present"
+          else
+            echo "FAIL: Boot failure state missing"
+            exit 1
+          fi
+
+      - name: Verify workspace-scoped deletes
+        run: |
+          if grep -q "removeByWorkspace" js/persistence.js; then
+            echo "Workspace-scoped deletes present"
+          else
+            echo "FAIL: Workspace-scoped deletes missing from persistence"
+            exit 1
+          fi
+          if grep -q "removeByWorkspace" js/db.js; then
+            echo "db.js exports removeByWorkspace"
+          else
+            echo "FAIL: db.js missing removeByWorkspace"
+            exit 1
+          fi

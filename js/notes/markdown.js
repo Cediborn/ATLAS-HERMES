@@ -15,12 +15,31 @@ function escapeHtml(str) {
     .replace(/'/g, '&#39;');
 }
 
+const SAFE_SCHEMES = /^(https?:|mailto:)/i;
+
+function safeHref(url) {
+  try {
+    // Allow relative URLs (no scheme) and safe schemes
+    if (/^[a-z][a-z0-9+.-]*:/i.test(url) && !SAFE_SCHEMES.test(url)) {
+      return null; // Unsafe scheme — render as plain text
+    }
+  } catch {
+    return null;
+  }
+  return url;
+}
+
 function inlineFormat(text) {
   return text
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
     .replace(/~~([^~]+)~~/g, '<del>$1</del>')
     .replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>')
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, href) => {
+      const safe = safeHref(href);
+      return safe
+        ? `<a href="${safe}" target="_blank" rel="noopener noreferrer">${label}</a>`
+        : label; // Render as plain text if URL is unsafe
+    });
 }
 
 export function renderMarkdown(source) {
