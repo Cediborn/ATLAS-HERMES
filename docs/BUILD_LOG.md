@@ -392,3 +392,10 @@ Verified with the new `tests/gold-driver.mjs` (splash markup + removal, gold com
 Added a gold glow accent to the shared `StatCard` (dashboard + all modules that use it): a soft radial bloom in the top-right corner plus a faint gold wash fading down from the top edge, via a `::before` layer that sits *below* the card content (children get `position: relative; z-index: 1` so text/icons are never tinted). The `--accent` variant glows stronger. Static, so it trivially respects reduced motion.
 
 Verified with `tests/statglow-driver.mjs` — computed-style checks plus real screenshot pixel sampling: plain card top-right warms to `#37332c`, accent card to `#4d4633`, bottom-left stays pure surface, accent > plain. 10/10, plus gold 12/12 and routes 11/11 regressions.
+
+### 1.13 — Gold PWA theme + notification branding
+
+- **PWA colors** (`app/index.html`, `app/manifest.webmanifest`): `theme-color` meta, `theme_color`, and `background_color` are now the logo gold `#E6C66D` — the mobile browser chrome is gold and the native PWA launch splash is a branded gold screen with the dark-tile gold logo.
+- **Browser notifications** (`js/browser-notifications.js`): switched the notification icon from the SVG favicon (unreliable in system notifications) to the gold-branded `icon-192.png`, and added `assets/badge.png` — a 96px transparent-background monochrome silhouette of the gold triangle mark for Android's status-bar badge. `tests/gen-icons.mjs` now exports icons via in-page canvas `toDataURL` so transparent backgrounds survive (screenshot capture forced an opaque background — caught by the pwa-gold driver's corner-alpha check).
+
+Verified with `tests/pwa-gold-driver.mjs` — manifest/meta gold, badge PNG valid with transparent corners + opaque mark, notification refs, clean boot. 11/11, plus logo 12/12, gold 12/12, routes 11/11 regressions.

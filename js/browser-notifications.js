@@ -94,7 +94,10 @@ export function syncBrowserNotifications() {
       const notif = new Notification('Atlas', {
         body: n.text,
         tag: n.id,
-        icon: '../assets/favicon.svg',
+        // Gold-branded icon (PNG — SVG icons are unreliable in system
+        // notifications) plus the small monochrome badge for Android.
+        icon: '../assets/icon-192.png',
+        badge: '../assets/badge.png',
       });
       notif.onclick = () => {
         window.focus();
