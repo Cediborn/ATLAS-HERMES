@@ -69,6 +69,8 @@ const paths = {
 
 export function icon(name, { size = 20, strokeWidth = 2, className = '' } = {}) {
   const inner = paths[name] || paths.x;
+  // NOTE: className is interpolated directly into the SVG tag.
+  // Only pass hardcoded/safe values — never user-controlled strings.
   const cls = className ? ` class="${className}"` : '';
   return `<svg${cls} viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
 }

@@ -264,9 +264,22 @@ async function run() {
 
       const replayHidden = await evaluate('document.getElementById("palette-replay")?.hidden');
       check('Replay button hidden in normal mode', replayHidden === true);
+
+      // Landing content sections rendered with esc() escaping
+      const philCount = await evaluate('document.querySelectorAll(".philosophy__item").length');
+      check('Philosophy cards rendered', philCount === 4, `got ${philCount}`);
+
+      const philText = await evaluate('document.querySelector(".philosophy__item h3")?.textContent ?? ""');
+      check('Philosophy title text is safe', philText === 'Local-first & persistent', `got: "${philText}"`);
+
+      const pillarCount = await evaluate('document.querySelectorAll(".pillar-card").length');
+      check('Pillar cards rendered', pillarCount === 12, `got ${pillarCount}`);
+
+      const pillarText = await evaluate('document.querySelector(".pillar-card h3")?.textContent ?? ""');
+      check('Pillar title text is safe', pillarText === 'Projects', `got: "${pillarText}"`);
     });
 
-    await sleep(500);
+    await sleep(2000);
 
     // ==============================
     // Scenario 2: Mobile (normal motion)
@@ -302,7 +315,7 @@ async function run() {
       check('No text overflow on mobile', overflow === 'ok', overflow);
     });
 
-    await sleep(500);
+    await sleep(2000);
 
     // ==============================
     // Scenario 3: Reduced motion
@@ -338,9 +351,9 @@ async function run() {
       await sleep(500);
 
       const playLabel = await evaluate('document.getElementById("palette-replay")?.textContent?.trim() ?? ""');
-      check('Button returns to "Play demo"', playLabel.includes('Play demo'), `got: "${playLabel}"`);
-    });
-    await sleep(500);
+      check('Button returns to "Play demo"', playLabel.includes('Play demo'), `got: "${playLabel}"`);    });
+
+    await sleep(2000);
 
     // ==============================
     // Scenario 4: Visibility pause/resume

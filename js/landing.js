@@ -4,6 +4,7 @@ import { icon } from './icons.js';
 import { pillars, heroDemos } from './mock-data.js';
 import { initTheme } from './theme.js';
 import { wait, waitOrHidden } from './timing.js';
+import { esc } from './sanitize.js';
 
 initTheme();
 
@@ -19,8 +20,8 @@ document.getElementById('philosophy').innerHTML = philosophy
     (p) => `
     <div class="philosophy__item">
       <span>${icon(p.icon, { size: 18 })}</span>
-      <h3>${p.title}</h3>
-      <p>${p.desc}</p>
+      <h3>${esc(p.title)}</h3>
+      <p>${esc(p.desc)}</p>
     </div>`
   )
   .join('');
@@ -30,8 +31,8 @@ document.getElementById('pillars-grid').innerHTML = pillars
     (p) => `
     <div class="pillar-card">
       <span class="pillar-card__icon">${icon(p.icon, { size: 20 })}</span>
-      <h3>${p.title}</h3>
-      <p>${p.desc}</p>
+      <h3>${esc(p.title)}</h3>
+      <p>${esc(p.desc)}</p>
     </div>`
   )
   .join('');
