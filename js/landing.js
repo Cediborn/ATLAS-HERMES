@@ -35,55 +35,206 @@ document.getElementById('pillars-grid').innerHTML = pillars
   )
   .join('');
 
-// ---- Hero command-palette demo: shows the "ambient AI" pillar instead of describing it ----
+// ---- Hero command-palette demo: cycles through example searches and results ----
 const typedEl = document.getElementById('palette-typed');
 const resultEl = document.getElementById('palette-result');
 const resultIconEl = document.getElementById('palette-result-icon');
 const resultTitleEl = document.getElementById('palette-result-title');
 const resultTimeEl = document.getElementById('palette-result-time');
 const resultTagEl = document.getElementById('palette-result-tag');
+const replayBtn = document.getElementById('palette-replay');
 
-const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+// Guard: if any hero element is missing, bail out cleanly.
+if (!typedEl || !resultEl || !resultIconEl || !resultTitleEl || !resultTimeEl || !resultTagEl) {
+  // No hero demo to run — landing page is still usable.
+} else {
+  // Respect the user's OS-level reduced-motion preference. When active,
+  // show a static example and offer an explicit opt-in control.
+  const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+  let reducedMotion = motionQuery.matches;
 
-function wait(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+  // State for loop lifecycle
+  let loopRunning = false;
+  let abortController = null; // AbortController to cancel in-flight waits
+  let loopIndex = 0;
 
-async function typeText(text) {
-  typedEl.textContent = '';
-  for (const char of text) {
-    typedEl.textContent += char;
-    await wait(35);
+  // --- Utility ---
+
+  /**
+   * Wait for `ms` milliseconds, but resolve immediately if the
+   * AbortController has been signaled (tab hidden, loop stopped, etc.).
+   */
+  function wait(ms, signal) {
+    return new Promise((resolve, reject) => {
+      if (signal && signal.aborted) { resolve(); return; }
+      const id = setTimeout(resolve, ms);
+      if (signal) {
+        signal.addEventListener('abort', () => { clearTimeout(id); resolve(); }, { once: true });
+      }
+    });
   }
-}
 
-function showResult(demo) {
-  resultIconEl.innerHTML = icon(demo.icon, { size: 18 });
-  resultTitleEl.textContent = demo.resultTitle;
-  resultTimeEl.textContent = demo.time;
-  resultTagEl.textContent = demo.tag;
-}
-
-async function runDemoLoop() {
-  if (reduceMotion) {
-    typedEl.textContent = heroDemos[0].typed;
-    showResult(heroDemos[0]);
-    resultEl.classList.add('is-visible');
-    return;
+  /**
+   * Wait for `ms` ms or until the tab becomes hidden. Returns true
+   * if the tab was hidden (caller should break out of the loop).
+   */
+  function waitOrHidden(ms, signal) {
+    return new Promise((resolve) => {
+      if (signal && signal.aborted) { resolve(false); return; }
+      let resolved = false;
+      const done = (hidden) => {
+        if (resolved) return;
+        resolved = true;
+        clearTimeout(timerId);
+        resolve(hidden);
+      };
+      const timerId = setTimeout(() => done(false), ms);
+      const onVis = () => { if (document.hidden) done(true); };
+      document.addEventListener('visibilitychange', onVis, { once: true });
+      if (signal) {
+        signal.addEventListener('abort', () => done(false), { once: true });
+      }
+    });
   }
 
-  let i = 0;
-  for (;;) {
-    const demo = heroDemos[i % heroDemos.length];
-    resultEl.classList.remove('is-visible');
+  async function typeText(text, signal) {
+    typedEl.textContent = '';
+    for (const char of text) {
+      if (signal && signal.aborted) return;
+      typedEl.textContent += char;
+      await wait(35, signal);
+    }
+  }
+
+  function showResult(demo) {
+    resultIconEl.innerHTML = icon(demo.icon, { size: 18 });
+    resultTitleEl.textContent = demo.resultTitle;
+    resultTimeEl.textContent = demo.time;
+    resultTagEl.textContent = demo.tag;
+  }
+
+  function showStatic() {
+    const demo = heroDemos[0];
+    typedEl.textContent = demo.typed;
     showResult(demo);
-    await typeText(demo.typed);
-    await wait(350);
     resultEl.classList.add('is-visible');
-    await wait(2400);
-    await wait(400);
-    i += 1;
   }
-}
 
-runDemoLoop();
+  function updateReplayButton() {
+    if (!replayBtn) return;
+    if (reducedMotion && !loopRunning) {
+      replayBtn.hidden = false;
+      replayBtn.textContent = '';
+      replayBtn.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg><span>Play demo</span>';
+    } else if (loopRunning && reducedMotion) {
+      // While playing in reduced-motion mode, show a stop control
+      replayBtn.hidden = false;
+      replayBtn.textContent = '';
+      replayBtn.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg><span>Stop demo</span>';
+    } else {
+      replayBtn.hidden = true;
+    }
+  }
+
+  // --- Loop ---
+
+  async function runDemoLoop() {
+    if (loopRunning) return; // guard: prevent duplicate loops
+    loopRunning = true;
+    abortController = new AbortController();
+    const signal = abortController.signal;
+    updateReplayButton();
+
+    try {
+      let i = loopIndex;
+      for (;;) {
+        if (signal.aborted) break;
+        if (document.hidden) {
+          // Wait until the page becomes visible again
+          await new Promise((resolve) => {
+            const onVis = () => { if (!document.hidden) { document.removeEventListener('visibilitychange', onVis); resolve(); } };
+            document.addEventListener('visibilitychange', onVis);
+            if (signal) signal.addEventListener('abort', () => { document.removeEventListener('visibilitychange', onVis); resolve(); }, { once: true });
+          });
+          if (signal.aborted || document.hidden) break;
+        }
+
+        const demo = heroDemos[i % heroDemos.length];
+        resultEl.classList.remove('is-visible');
+        showResult(demo);
+        await typeText(demo.typed, signal);
+        if (signal.aborted) break;
+        const hiddenDuringWait = await waitOrHidden(350, signal);
+        if (signal.aborted || hiddenDuringWait) break;
+        resultEl.classList.add('is-visible');
+        const hiddenDuringResult = await waitOrHidden(2800, signal);
+        if (signal.aborted || hiddenDuringResult) break;
+        loopIndex = (i + 1);
+        i += 1;
+      }
+    } finally {
+      loopRunning = false;
+      abortController = null;
+      updateReplayButton();
+    }
+  }
+
+  function stopLoop() {
+    if (abortController) {
+      abortController.abort();
+      abortController = null;
+    }
+    loopRunning = false;
+    updateReplayButton();
+  }
+
+  // --- Reduced-motion change listener ---
+  motionQuery.addEventListener('change', (e) => {
+    reducedMotion = e.matches;
+    if (reducedMotion) {
+      // User enabled reduced motion — stop the loop, show static
+      stopLoop();
+      showStatic();
+    } else {
+      // User disabled reduced motion — start the loop
+      loopIndex = 0;
+      runDemoLoop();
+    }
+  });
+
+  // --- Replay button ---
+  if (replayBtn) {
+    replayBtn.addEventListener('click', () => {
+      if (loopRunning) {
+        stopLoop();
+        showStatic();
+      } else {
+        loopIndex = 0;
+        runDemoLoop();
+      }
+    });
+  }
+
+  // --- Pause on tab hidden, resume on visible ---
+  document.addEventListener('visibilitychange', () => {
+    // The loop itself handles hidden→visible transitions.
+    // When visible→hidden during a wait, waitOrHidden resolves
+    // immediately and the loop breaks. We re-enter on next visible.
+    if (!document.hidden && !loopRunning && !reducedMotion) {
+      runDemoLoop();
+    }
+  });
+
+  // --- Boot ---
+  // Start the demo after the DOM is ready (already is, since this is
+  // a module — modules are deferred). Use requestAnimationFrame to
+  // ensure the first paint has happened.
+  requestAnimationFrame(() => {
+    if (reducedMotion) {
+      showStatic();
+      updateReplayButton();
+    } else {
+      runDemoLoop();
+    }
+  });
+}
