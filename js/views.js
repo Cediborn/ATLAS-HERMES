@@ -324,10 +324,44 @@ export function renderDashboard(container) {
     });
   });
 
-  // Quick actions open the command palette (quick-capture).
+  // Quick actions → direct creation. Each button navigates to the
+  // appropriate module and opens the creation dialog/interface.
   container.querySelector('.quick-actions')?.addEventListener('click', (e) => {
-    if (e.target.closest('.quick-action')) {
-      document.getElementById('search-trigger').click();
+    const btn = e.target.closest('.quick-action');
+    if (!btn) return;
+    const action = btn.dataset.action;
+
+    switch (action) {
+      case 'project':
+        // Project dialog is a shared form-dialog modal — works from anywhere
+        import('./projects/dialog.js').then((m) => m.openProjectDialog('create', null, () => {}));
+        break;
+      case 'note':
+        // Navigate to Notes, then click the "New Note" toolbar button
+        window.location.hash = '/notes';
+        const tryClickNote = () => {
+          const noteBtn = document.getElementById('notes-new');
+          if (noteBtn) noteBtn.click();
+          else setTimeout(tryClickNote, 100);
+        };
+        setTimeout(tryClickNote, 100);
+        break;
+      case 'event':
+        // Event dialog requires initEventPanel (calendar view must be mounted)
+        window.location.hash = '/calendar';
+        setTimeout(() => {
+          import('./calendar/event-panel.js').then((m) =>
+            m.openEventDialog('create', new Date().toISOString().slice(0, 10))
+          );
+        }, 200);
+        break;
+      case 'task':
+        // Tasks are sub-items of projects — navigate to Projects
+        window.location.hash = '/projects';
+        break;
+      default:
+        // Fallback: open command palette for unknown actions
+        document.getElementById('search-trigger').click();
     }
   });
 }
