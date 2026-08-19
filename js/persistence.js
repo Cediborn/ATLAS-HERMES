@@ -170,6 +170,8 @@ export async function hydrate() {
 export async function switchWorkspace(workspaceId) {
   setState({ workspaceId });
   await hydrateWorkspace(workspaceId);
+  // Notify listeners that data has changed (sidebar Today card, etc.)
+  window.dispatchEvent(new CustomEvent('atlas:data-changed'));
 }
 
 // Adds the sample dataset back alongside the user's own data. Safe to run any

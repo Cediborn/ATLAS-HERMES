@@ -9,6 +9,15 @@ import { icon } from './icons.js';
 import { getState, setState } from './store.js';
 import { workspaces } from './config.js';
 import { createPopover } from './popover.js';
+import { esc } from './sanitize.js';
+import { todayKey, dateKey } from './date-utils.js';
+import { projects } from './projects/data.js';
+import { habits } from './habits/data.js';
+import { computeStreak, dayState, topStreaks, computeDashboardStats } from './habits/state.js';
+import { getEventsInRange } from './calendar/repository.js';
+import { formatTime } from './calendar/state.js';
+import { goals } from './goals/data.js';
+import { computeGoalProgress } from './goals/state.js';
 
 const MOBILE_BREAKPOINT = 768;
 
@@ -50,6 +59,70 @@ export function setActiveRoute(routeId) {
     if (a.dataset.route === routeId) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');
   });
+}
+
+// ---- Sidebar Today card --------------------------------------------------
+// A compact, subtle card anchored at the bottom of the sidebar showing
+// today's date, remaining tasks, next event, and a top habit streak.
+// Pulled from real data, not hard-coded.
+export function renderSidebarToday() {
+  const el = document.getElementById('sidebar-today');
+  if (!el) return;
+
+  const now = new Date();
+  const dateStr = new Intl.DateTimeFormat('en-US', {
+    weekday: 'long', month: 'short', day: 'numeric',
+  }).format(now);
+
+  // Tasks due today / overdue
+  const today = todayKey();
+  let tasksDue = 0;
+  for (const p of projects) {
+    for (const t of p.tasks || []) {
+      if (t.done) continue;
+      const due = t.due || p.deadline || null;
+      if (due && due <= today) tasksDue += 1;
+    }
+  }
+
+  // Next upcoming event today
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setHours(23, 59, 59, 999);
+  const todayEvents = getEventsInRange(start, end).sort((a, b) => new Date(a.start) - new Date(b.start));
+  const nextEvent = todayEvents[0];
+
+  // Best current streak
+  const bestStreak = topStreaks('current', 1)[0];
+  const streakCount = bestStreak?.streak.current || 0;
+  const streakName = bestStreak?.habit.title || '';
+
+  // Active goals
+  const activeGoals = goals.filter((g) => g.status !== 'Completed' && g.status !== 'Archived');
+  const topGoal = activeGoals[0];
+
+  let html = `<div class="sidebar-today__label">TODAY</div>`;
+  html += `<div class="sidebar-today__date">${esc(dateStr)}</div>`;
+
+  if (tasksDue > 0) {
+    html += `<div class="sidebar-today__stat">${icon('check', { size: 14 })}<span>${tasksDue} task${tasksDue !== 1 ? 's' : ''} remaining</span></div>`;
+  }
+
+  if (nextEvent) {
+    const timeStr = nextEvent.allDay ? 'All day' : formatTime(nextEvent.start);
+    html += `<div class="sidebar-today__stat">${icon('calendar', { size: 14 })}<span>${esc(timeStr)} — ${esc(nextEvent.title)}</span></div>`;
+  }
+
+  if (streakCount > 0) {
+    html += `<div class="sidebar-today__stat sidebar-today__stat--streak">${icon('flame', { size: 14 })}<span>${streakCount} day streak</span></div>`;
+  }
+
+  if (tasksDue === 0 && !nextEvent && streakCount === 0) {
+    html += `<div class="sidebar-today__stat">${icon('sparkle', { size: 14 })}<span>Clear schedule</span></div>`;
+  }
+
+  el.innerHTML = html;
 }
 
 let onWorkspaceChangeCb = null;
@@ -105,6 +178,11 @@ export function initSidebarControls({ onWorkspaceChange } = {}) {
   else desktopQuery.addListener(handleDesktopResize);
 
   initWorkspaceSwitcher();
+  renderSidebarToday();
+
+  // Re-render the Today card on route changes and data mutations
+  window.addEventListener('hashchange', () => renderSidebarToday());
+  window.addEventListener('atlas:data-changed', () => renderSidebarToday());
 }
 
 function toggleCollapse(appShell, collapseToggle) {

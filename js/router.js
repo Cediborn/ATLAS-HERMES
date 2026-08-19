@@ -9,6 +9,7 @@ import { navItems } from './config.js';
 import { renderDashboard, renderEmptyState, renderSettings } from './views.js';
 import { setActiveRoute } from './sidebar.js';
 import { setPageTitle } from './topbar.js';
+import { resetScrollHeader } from './scroll-header.js';
 
 const DEFAULT_ROUTE = 'dashboard';
 
@@ -19,6 +20,9 @@ function currentRouteId() {
 function render(routeId) {
   const item = navItems.find((n) => n.id === routeId) || navItems.find((n) => n.id === DEFAULT_ROUTE);
   const root = document.getElementById('view-root');
+
+  // Reset scroll header so the new module starts with the header visible
+  resetScrollHeader();
 
   if (item.id === 'dashboard') {
     renderDashboard(root);

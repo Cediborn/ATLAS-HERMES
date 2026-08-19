@@ -9,6 +9,7 @@ import { initTopbar } from './topbar.js';
 import { initCommandPalette } from './command-palette.js';
 import { initRouter, navigate, rerender } from './router.js';
 import { initLuna } from './luna.js';
+import { initScrollHeader } from './scroll-header.js';
 import { hydrate, switchWorkspace } from './persistence.js';
 import { syncBrowserNotifications } from './browser-notifications.js';
 
@@ -71,6 +72,7 @@ async function boot() {
     return;
   }
   initRouter();
+  initScrollHeader();
   setTimeout(hideSplash, Math.max(0, MIN_SPLASH_MS - (performance.now() - bootStart)));
 
   registerServiceWorker();
