@@ -4,18 +4,20 @@
 // DOM and owns all its event listeners.
 
 import { icon } from './icons.js';
-import { todayKey, dateKey, formatDate } from './date-utils.js';
+import { todayKey, dateKey, formatDate, daysUntil } from './date-utils.js';
 import { projects as allProjects } from './projects/data.js';
 import { goals as allGoals } from './goals/data.js';
 import { computeGoalProgress } from './goals/state.js';
 import { habits as allHabits } from './habits/data.js';
-import { topStreaks } from './habits/state.js';
+import { topStreaks, computeSuccessRate, dayState } from './habits/state.js';
 import { accounts, transactions } from './finance/data.js';
 import { accountBalance, formatCurrency, computeFinanceStats } from './finance/state.js';
 import { books as allBooks } from './books/data.js';
 import { computeBookProgress } from './books/state.js';
 import { codingItems as allCoding } from './coding/data.js';
 import { computeItemProgress } from './coding/state.js';
+import { resources as allResources } from './learning/data.js';
+import { computeResourceProgress } from './learning/state.js';
 import { getEventsInRange } from './calendar/repository.js';
 import { formatTime } from './calendar/state.js';
 
@@ -119,6 +121,152 @@ function eventsAnswer() {
   return `<ul class="luna-list">${rows}</ul>`;
 }
 
+function overdueAnswer() {
+  const todayK = todayKey();
+  const rows = [];
+  // Overdue tasks
+  for (const p of allProjects) {
+    for (const t of p.tasks || []) {
+      if (t.done) continue;
+      const due = t.due || p.deadline || null;
+      if (due && due < todayK) rows.push(`<li>${esc(t.title)} <span class="luna-list__meta">${esc(p.title)} · ${Math.abs(daysUntil(due))}d overdue</span></li>`);
+    }
+  }
+  // Overdue goal deadlines
+  for (const g of allGoals) {
+    if (g.status === 'Completed' || g.status === 'Archived' || !g.deadline) continue;
+    if (daysUntil(g.deadline) < 0) rows.push(`<li>${esc(g.title)} <span class="luna-list__meta">deadline ${Math.abs(daysUntil(g.deadline))}d overdue</span></li>`);
+  }
+  if (!rows.length) return '<p>Nothing overdue — you\u2019re on top of things.</p>';
+  return `<p><strong>${rows.length} overdue item${rows.length === 1 ? '' : 's'}</strong>:</p><ul class="luna-list">${rows.join('')}</ul>`;
+}
+
+function neglectedGoalsAnswer() {
+  const active = allGoals
+    .filter((g) => g.status !== 'Completed' && g.status !== 'Archived')
+    .map((g) => ({ goal: g, progress: computeGoalProgress(g) }));
+  const neglected = active
+    .filter(({ goal, progress }) => {
+      if (goal.status === 'At Risk' || goal.status === 'Blocked') return true;
+      if (progress < 30 && goal.deadline && daysUntil(goal.deadline) < 30) return true;
+      if (goal.deadline && daysUntil(goal.deadline) < 0) return true;
+      return false;
+    })
+    .sort((a, b) => (a.goal.deadline ? daysUntil(a.goal.deadline) : 999) - (b.goal.deadline ? daysUntil(b.goal.deadline) : 999));
+  if (!neglected.length) return '<p>All your goals look healthy. Keep it up.</p>';
+  const rows = neglected
+    .map(({ goal, progress }) => {
+      const urgency = goal.deadline && daysUntil(goal.deadline) < 0 ? 'overdue' : goal.status;
+      return `<li><span class="luna-list__bar" style="width:${progress}%"></span>${esc(goal.title)} <span class="luna-list__meta">${progress}% · ${urgency}${goal.deadline ? ` · ${formatDate(goal.deadline)}` : ''}</span></li>`;
+    })
+    .join('');
+  return `<ul class="luna-list">${rows}</ul>`;
+}
+
+function whatNextAnswer() {
+  const suggestions = [];
+  const todayK = todayKey();
+  // Overdue tasks first
+  for (const p of allProjects) {
+    for (const t of p.tasks || []) {
+      if (t.done) continue;
+      const due = t.due || p.deadline || null;
+      if (due && due < todayK) suggestions.push({ priority: 0, html: `<li>${esc(t.title)} <span class="luna-list__meta">overdue in ${esc(p.title)}</span></li>` });
+    }
+  }
+  // Tasks due today
+  for (const p of allProjects) {
+    for (const t of p.tasks || []) {
+      if (t.done) continue;
+      const due = t.due || p.deadline || null;
+      if (due && due === todayK) suggestions.push({ priority: 1, html: `<li>${esc(t.title)} <span class="luna-list__meta">due today in ${esc(p.title)}</span></li>` });
+    }
+  }
+  // At-risk goals
+  for (const g of allGoals.filter((g) => g.status === 'At Risk' || g.status === 'Blocked')) {
+    suggestions.push({ priority: 2, html: `<li>${esc(g.title)} <span class="luna-list__meta">${g.status} goal</span></li>` });
+  }
+  // Incomplete habits today
+  for (const h of allHabits.filter((h) => !h.archived && dayState(h, new Date()) === 'incomplete')) {
+    suggestions.push({ priority: 3, html: `<li>${esc(h.title)} <span class="luna-list__meta">habit not done yet</span></li>` });
+  }
+  suggestions.sort((a, b) => a.priority - b.priority);
+  const top = suggestions.slice(0, 5);
+  if (!top.length) return '<p>Nothing pressing. Pick whatever energizes you most.</p>';
+  return `<p>Here\u2019s what I\u2019d focus on:</p><ul class="luna-list">${top.map((s) => s.html).join('')}</ul>`;
+}
+
+function weekSummaryAnswer() {
+  const today = new Date();
+  const weekAgo = new Date(today);
+  weekAgo.setDate(weekAgo.getDate() - 7);
+  const todayK = todayKey();
+  const weekAgoK = dateKey(weekAgo);
+  // Tasks completed this week
+  let tasksDone = 0;
+  for (const p of allProjects) {
+    for (const t of p.tasks || []) {
+      if (t.done && t.createdAt && t.createdAt >= weekAgoK) tasksDone++;
+    }
+  }
+  // Habits success rate
+  let habitDue = 0, habitDone = 0;
+  for (const h of allHabits.filter((h) => !h.archived)) {
+    const rate = computeSuccessRate(h, 7);
+    habitDue++;
+    habitDone += rate > 0 ? 1 : 0;
+  }
+  const habitPct = habitDue ? Math.round((habitDone / habitDue) * 100) : 0;
+  // Goal progress
+  const activeGoals = allGoals.filter((g) => g.status !== 'Completed' && g.status !== 'Archived');
+  const avgProgress = activeGoals.length ? Math.round(activeGoals.reduce((s, g) => s + computeGoalProgress(g), 0) / activeGoals.length) : 0;
+  const bits = [
+    `${tasksDone} task${tasksDone === 1 ? '' : 's'} completed this week`,
+    `${habitPct}% of habits had activity`,
+    `Average goal progress: ${avgProgress}%`,
+  ];
+  return `<p><strong>This week in review:</strong></p><ul class="luna-list">${bits.map((b) => `<li>${esc(b)}</li>`).join('')}</ul>`;
+}
+
+function searchAnswer(query) {
+  const q = query.toLowerCase();
+  const results = [];
+  // Search projects
+  for (const p of allProjects) {
+    if (p.title.toLowerCase().includes(q) || p.description.toLowerCase().includes(q) || (p.tags || []).some((t) => t.toLowerCase().includes(q))) {
+      results.push(`<li><span class="luna-list__meta">Project</span> ${esc(p.title)} <span class="luna-list__meta">· ${p.status}</span></li>`);
+    }
+  }
+  // Search tasks
+  for (const p of allProjects) {
+    for (const t of p.tasks || []) {
+      if (t.title.toLowerCase().includes(q)) {
+        results.push(`<li><span class="luna-list__meta">Task</span> ${esc(t.title)} <span class="luna-list__meta">· ${esc(p.title)}</span></li>`);
+      }
+    }
+  }
+  // Search goals
+  for (const g of allGoals) {
+    if (g.title.toLowerCase().includes(q) || g.description.toLowerCase().includes(q)) {
+      results.push(`<li><span class="luna-list__meta">Goal</span> ${esc(g.title)} <span class="luna-list__meta">· ${g.status}</span></li>`);
+    }
+  }
+  // Search learning
+  for (const r of allResources) {
+    if (r.title.toLowerCase().includes(q) || r.author.toLowerCase().includes(q) || (r.tags || []).some((t) => t.toLowerCase().includes(q))) {
+      results.push(`<li><span class="luna-list__meta">Learning</span> ${esc(r.title)} <span class="luna-list__meta">· ${r.status}</span></li>`);
+    }
+  }
+  // Search habits
+  for (const h of allHabits) {
+    if (h.title.toLowerCase().includes(q) || (h.tags || []).some((t) => t.toLowerCase().includes(q))) {
+      results.push(`<li><span class="luna-list__meta">Habit</span> ${esc(h.title)} <span class="luna-list__meta">· ${h.category}</span></li>`);
+    }
+  }
+  if (!results.length) return `<p>Nothing found for "${esc(query)}".</p>`;
+  return `<p><strong>${results.length} result${results.length === 1 ? '' : 's'}</strong> for "${esc(query)}":</p><ul class="luna-list">${results.join('')}</ul>`;
+}
+
 function greetingAnswer() {
   const hour = new Date().getHours();
   const part = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
@@ -152,6 +300,11 @@ const HELP_LINES = [
   ['"Currently reading"', 'books in progress'],
   ['"Coding progress"', 'open problems and builds'],
   ['"Upcoming events"', 'today\u2019s calendar'],
+  ['"What\u2019s overdue?"', 'overdue tasks and goals'],
+  ['"Neglected goals"', 'goals needing attention'],
+  ['"What should I work on next?"', 'prioritized suggestions'],
+  ['"This week"', 'weekly summary'],
+  ['"Everything about X"', 'cross-module search'],
 ].map((l) => (Array.isArray(l) ? `<li><code>${l[0]}</code> <span class="luna-list__meta">${l[1]}</span></li>` : `<li>${l}</li>`)).join('');
 
 function answerFor(raw) {
@@ -176,7 +329,7 @@ function answerFor(raw) {
   };
 }
 
-const SUGGESTIONS = ['What\u2019s on today?', 'Top goals', 'Best streak', 'My money', 'Currently reading', 'Coding progress', 'Upcoming events'];
+const SUGGESTIONS = ['What\u2019s on today?', 'Top goals', 'Best streak', 'My money', 'What\u2019s overdue?', 'What should I work on next?', 'This week'];
 
 // ================= DOM + EVENTS =================
 

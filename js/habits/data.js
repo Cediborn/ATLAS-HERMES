@@ -117,7 +117,7 @@ export let habits = [
     category: 'morning', icon: 'flame', color: 'amber', frequency: 'daily', customDays: null,
     reminderTime: '06:30', goal: { targetValue: 3, unit: 'miles' }, priority: 'High',
     tags: ['Wellness'], notes: 'Route through the park when it\u2019s not raining.',
-    favorite: true, archived: false, linkedProjectId: null, goalId: null,
+    favorite: true, archived: false, linkedProjectId: null, goalId: 'g3',
     createdAt: daysAgo(150), updatedAt: daysAgo(0),
   },
   {
@@ -125,7 +125,7 @@ export let habits = [
     category: 'evening', icon: 'bookOpen', color: 'violet', frequency: 'daily', customDays: null,
     reminderTime: '21:00', goal: { targetValue: 20, unit: 'pages' }, priority: 'Medium',
     tags: ['Learning'], notes: '',
-    favorite: false, archived: false, linkedProjectId: null, goalId: null,
+    favorite: false, archived: false, linkedProjectId: null, goalId: 'g4',
     createdAt: daysAgo(120), updatedAt: daysAgo(0),
   },
   {
@@ -149,7 +149,7 @@ export let habits = [
     category: 'learning', icon: 'bookOpen', color: 'blue', frequency: 'weekdays', customDays: null,
     reminderTime: '18:00', goal: { targetValue: 45, unit: 'minutes' }, priority: 'High',
     tags: ['University'], notes: 'Pairs with the thesis benchmark work.',
-    favorite: false, archived: false, linkedProjectId: 'p5', goalId: null,
+    favorite: false, archived: false, linkedProjectId: 'p5', goalId: 'g1',
     createdAt: daysAgo(95), updatedAt: daysAgo(0),
   },
   {
@@ -165,7 +165,7 @@ export let habits = [
     category: 'coding', icon: 'code', color: 'blue', frequency: 'weekdays', customDays: null,
     reminderTime: '12:30', goal: { targetValue: 1, unit: 'problem' }, priority: 'Medium',
     tags: ['Engineering', 'Interview prep'], notes: 'Fell off after last week\u2019s deadline crunch — restarting.',
-    favorite: false, archived: false, linkedProjectId: null, goalId: null,
+    favorite: false, archived: false, linkedProjectId: null, goalId: 'g1',
     createdAt: daysAgo(130), updatedAt: daysAgo(0),
   },
   {
@@ -173,7 +173,7 @@ export let habits = [
     category: 'fitness', icon: 'flame', color: 'emerald', frequency: 'daily', customDays: null,
     reminderTime: '20:00', goal: { targetValue: 20, unit: 'minutes' }, priority: 'Low',
     tags: ['Wellness'], notes: 'Skip on rain days rather than force it indoors.',
-    favorite: false, archived: false, linkedProjectId: null, goalId: null,
+    favorite: false, archived: false, linkedProjectId: null, goalId: 'g3',
     createdAt: daysAgo(140), updatedAt: daysAgo(0),
   },
   {
@@ -197,7 +197,7 @@ export let habits = [
     category: 'custom', icon: 'wallet', color: 'amber', frequency: 'custom', customDays: [0],
     reminderTime: '10:00', goal: null, priority: 'Medium',
     tags: ['Finance'], notes: 'Paused for now.',
-    favorite: false, archived: true, linkedProjectId: null, goalId: null,
+    favorite: false, archived: true, linkedProjectId: null, goalId: 'g5',
     createdAt: daysAgo(200), updatedAt: daysAgo(35),
   },
 ];

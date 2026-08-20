@@ -7,6 +7,7 @@ import { icon } from '../icons.js';
 import { CATEGORY_CONFIG, CATEGORIES, PRIORITIES, FREQUENCIES, FREQUENCY_CONFIG, WEEKDAY_LABELS, HABIT_COLORS } from './data.js';
 import { createHabit, updateHabit, deleteHabit } from './state.js';
 import { projects } from '../projects/data.js';
+import { goals } from '../goals/data.js';
 
 const ICON_CHOICES = ['flame', 'sun', 'moon', 'heart', 'bookOpen', 'book', 'code', 'sparkle', 'target', 'wallet', 'fileText', 'repeat'];
 
@@ -136,6 +137,12 @@ function renderDialog(mode, existing) {
               ${projects.map((p) => `<option value="${p.id}" ${p.id === base.linkedProjectId ? 'selected' : ''}>${p.title}</option>`).join('')}
             </select>
           </div>
+          <div class="field"><label for="hd-goal-select">Linked goal</label>
+            <select id="hd-goal-select">
+              <option value="">None</option>
+              ${goals.map((g) => `<option value="${g.id}" ${g.id === base.goalId ? 'selected' : ''}>${g.title}</option>`).join('')}
+            </select>
+          </div>
         </div>
 
         <div class="field"><label for="hd-tags">Tags</label><input id="hd-tags" type="text" value="${escapeAttr((base.tags || []).join(', '))}" placeholder="Comma-separated, e.g. Wellness, Morning" /></div>
@@ -226,6 +233,7 @@ function submitDialog(mode, base) {
 
   const tags = document.getElementById('hd-tags').value.split(',').map((t) => t.trim()).filter(Boolean);
   const linkedProjectId = document.getElementById('hd-project').value || null;
+  const goalId = document.getElementById('hd-goal-select').value || null;
 
   const payload = {
     title,
@@ -239,6 +247,7 @@ function submitDialog(mode, base) {
     tags,
     notes: document.getElementById('hd-notes').value.trim(),
     linkedProjectId,
+    goalId,
   };
 
   if (mode === 'edit') {

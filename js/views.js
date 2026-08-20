@@ -23,6 +23,7 @@ import { computeDashboardStats, computeStreak, computeSuccessRate, dayState, top
 import { getEventsInRange } from './calendar/repository.js';
 import { calendar as getCalendarInfo } from './calendar/data.js';
 import { formatTime } from './calendar/state.js';
+import { daysUntil } from './date-utils.js';
 import { esc } from './sanitize.js';
 import {
   StatCard,
@@ -91,11 +92,17 @@ export function renderDashboard(container) {
   const bestStreakHabit = topStreaks('current', 1)[0];
   const streakTrend = bestStreakHabit ? computeTrend(bestStreakHabit.habit) : 0;
 
+  // Cross-module metrics: goals needing attention, overdue goals, learning activity
+  const overdueGoals = allGoals.filter((g) => g.status !== 'Completed' && g.status !== 'Archived' && g.deadline && daysUntil(g.deadline) < 0);
+  const atRiskGoals = allGoals.filter((g) => g.status === 'At Risk' || g.status === 'Blocked');
+  const activeLearning = allResources.filter((r) => r.status === 'In Progress');
+  const overdueCount = todayDue.filter((r) => r.overdue).length;
+
   const stats = [
-    StatCard({ title: 'Tasks Due', value: String(todayDue.length), icon: 'check', accent: 'accent', trend: `${todayDue.filter((r) => r.overdue).length} overdue` }),
+    StatCard({ title: 'Tasks Due', value: String(todayDue.length), icon: 'check', accent: overdueCount ? 'danger' : 'accent', trend: overdueCount ? `${overdueCount} overdue` : 'On track' }),
     StatCard({ title: 'Habit Streak', value: `${habitStats.currentStreak} days`, icon: 'flame', trend: `${streakTrend >= 0 ? '+' : ''}${streakTrend}% vs last week`, accent: 'warning' }),
     StatCard({ title: 'Events Today', value: String(evtsToday.length), icon: 'calendar', accent: 'success' }),
-    StatCard({ title: 'Notes This Week', value: String(notesWeek.length), icon: 'fileText' }),
+    StatCard({ title: 'Goals', value: `${allGoals.filter((g) => g.status !== 'Completed' && g.status !== 'Archived').length} active`, icon: 'target', accent: overdueGoals.length ? 'danger' : 'accent', trend: overdueGoals.length ? `${overdueGoals.length} overdue` : (atRiskGoals.length ? `${atRiskGoals.length} at risk` : 'All on track') }),
   ].join('');
 
   // ---- Today's overview: real tasks due today/overdue ----
@@ -231,6 +238,50 @@ export function renderDashboard(container) {
 
 
 
+  // ---- Needs Attention: overdue items, at-risk goals, upcoming deadlines ----
+  const attentionItems = [];
+  // Overdue tasks
+  for (const { task, project } of todayDue.filter((r) => r.overdue).slice(0, 3)) {
+    attentionItems.push({ icon: 'check', title: task.title, meta: `${project.title} · Overdue`, urgency: 'danger' });
+  }
+  // At-risk/blocked goals
+  for (const g of atRiskGoals.slice(0, 2)) {
+    attentionItems.push({ icon: 'target', title: g.title, meta: `${g.status} · ${g.deadline ? formatDate(g.deadline) : 'No deadline'}`, urgency: g.status === 'Blocked' ? 'danger' : 'warning' });
+  }
+  // Overdue goal deadlines
+  for (const g of overdueGoals.slice(0, 2)) {
+    const days = Math.abs(daysUntil(g.deadline));
+    attentionItems.push({ icon: 'target', title: `${g.title} deadline`, meta: `${days}d overdue`, urgency: 'danger' });
+  }
+  // Upcoming project deadlines (next 3 days)
+  const upcomingDeadlines = allProjects
+    .filter((p) => p.deadline && p.status !== 'Completed' && p.status !== 'Archived')
+    .filter((p) => { const d = daysUntil(p.deadline); return d !== null && d >= 0 && d <= 3; })
+    .sort((a, b) => new Date(a.deadline) - new Date(b.deadline))
+    .slice(0, 2);
+  for (const p of upcomingDeadlines) {
+    const d = daysUntil(p.deadline);
+    attentionItems.push({ icon: 'folder', title: p.title, meta: d === 0 ? 'Due today' : `Due in ${d}d`, urgency: d === 0 ? 'warning' : 'accent' });
+  }
+  // Habits with broken streaks (0 current streak but active)
+  const brokenStreaks = topStreaks('current', 5).filter(({ streak }) => streak.current === 0).slice(0, 2);
+  for (const { habit } of brokenStreaks) {
+    attentionItems.push({ icon: habit.icon, title: habit.title, meta: 'Streak broken · Start today', urgency: 'neutral' });
+  }
+
+  const attentionBody = attentionItems.length
+    ? attentionItems
+        .map((item) => `
+          <div class="task-item" tabindex="0">
+            <span class="task-item__check task-item__check--${item.urgency}" aria-hidden="true">${icon(item.icon, { size: 11 })}</span>
+            <span class="task-item__body">
+              <span class="task-item__title">${esc(item.title)}</span>
+              <span class="task-item__meta"><span class="task-item__due task-item__due--${item.urgency}">${esc(item.meta)}</span></span>
+            </span>
+          </div>`)
+        .join('')
+    : emptyState({ icon: 'sparkle', title: 'Everything looks good', description: 'No items need your attention right now.', size: 'sm' });
+
   const welcome = !localStorage.getItem('atlas:welcomeSeen')
     ? `<div class="welcome-banner" role="status">
         <div class="welcome-banner__body"><strong>Welcome to Atlas.</strong> Everything you create is saved locally in your browser — nothing leaves your machine. Press <kbd>Ctrl/⌘</kbd><kbd>K</kbd> to search or jump anywhere.</div>
@@ -255,6 +306,7 @@ export function renderDashboard(container) {
 
       <div class="dashboard__grid">
         <div class="dashboard__col dashboard__col--left">
+          ${SectionCard({ title: 'Needs Attention', description: 'Items requiring your focus', content: attentionBody })}
           ${SectionCard({ title: "Today's Overview", action: sectionAction('projects'), content: todayBody })}
           ${SectionCard({ title: 'Recent Projects', action: sectionAction('projects'), content: projectsBody })}
           ${SectionCard({ title: 'Top Goals', action: sectionAction('goals'), content: goalsBody })}
@@ -356,8 +408,24 @@ export function renderDashboard(container) {
         }, 200);
         break;
       case 'task':
-        // Tasks are sub-items of projects — navigate to Projects
+        // Tasks live inside a project detail panel — navigate to Projects,
+        // click the first project card, then focus the task-add input.
         window.location.hash = '/projects';
+        const tryOpenTask = () => {
+          const grid = document.getElementById('projects-grid');
+          if (grid && grid.classList.contains('projects-grid--empty')) return; // no projects yet
+          const card = document.querySelector('.project-card');
+          if (card) {
+            card.click();
+            const tryFocusTask = () => {
+              const input = document.getElementById('task-add-input');
+              if (input) { input.focus(); input.scrollIntoView({ block: 'center' }); }
+              else setTimeout(tryFocusTask, 100);
+            };
+            setTimeout(tryFocusTask, 100);
+          } else if (grid) setTimeout(tryOpenTask, 100);
+        };
+        setTimeout(tryOpenTask, 100);
         break;
       default:
         // Fallback: open command palette for unknown actions

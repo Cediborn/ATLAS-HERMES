@@ -26,6 +26,8 @@ export const navItems = [
   // LIFE
   { id: 'habits', label: 'Habits', icon: 'flame', group: 'Life' },
   { id: 'finance', label: 'Finance', icon: 'wallet', group: 'Life' },
+  // UTILITIES
+  { id: 'settings', label: 'Settings', icon: 'settings' },
 ];
 
 export const quickActions = [

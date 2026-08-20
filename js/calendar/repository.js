@@ -8,6 +8,8 @@
 import { events, calendar, createEventId } from './data.js';
 import { projects } from '../projects/data.js';
 import { habits, isDueOn } from '../habits/data.js';
+import { goals } from '../goals/data.js';
+import { resources } from '../learning/data.js';
 import { saveEvents } from '../persistence.js';
 
 // ---- Recurrence expansion (pure) — occurrences are computed on demand for
@@ -153,12 +155,64 @@ function adaptHabitReminders(rangeStart, rangeEnd) {
   return results;
 }
 
+// Adapt project tasks with due dates into calendar events
+function adaptProjectTasks(rangeStart, rangeEnd) {
+  const results = [];
+  for (const p of projects) {
+    if (p.status === 'Archived') continue;
+    for (const t of (p.tasks || [])) {
+      if (t.done || !t.due) continue;
+      const dueDate = new Date(`${t.due}T18:00`);
+      if (dueDate < rangeStart || dueDate > rangeEnd) continue;
+      results.push({
+        id: `task-${p.id}-${t.id}`, occurrenceKey: `task-${p.id}-${t.id}`,
+        title: t.title, description: `Task in ${p.title}`, notes: '',
+        start: `${t.due}T18:00`, end: `${t.due}T18:30`, allDay: false,
+        calendarId: 'work', color: null, location: '',
+        recurring: false, recurrenceRule: null, completed: false,
+        priority: 'medium', type: 'Project Deadline', deadline: true,
+        reminderMinutesBefore: 60, projectId: p.id, habitId: null, goalId: null,
+        attachmentsCount: 0, createdAt: p.createdAt, updatedAt: p.updatedAt,
+        googleEventId: null, source: 'tasks', isOccurrence: false,
+      });
+    }
+  }
+  return results;
+}
+
+// Adapt goal milestones with due dates into calendar events
+function adaptGoalMilestones(rangeStart, rangeEnd) {
+  const results = [];
+  for (const g of goals) {
+    if (g.status === 'Completed' || g.status === 'Archived') continue;
+    for (const m of (g.milestones || [])) {
+      if (m.done || !m.due) continue;
+      const dueDate = new Date(`${m.due}T12:00`);
+      if (dueDate < rangeStart || dueDate > rangeEnd) continue;
+      results.push({
+        id: `milestone-${g.id}-${m.id}`, occurrenceKey: `milestone-${g.id}-${m.id}`,
+        title: m.title, description: `Milestone in ${g.title}`, notes: '',
+        start: `${m.due}T12:00`, end: `${m.due}T12:30`, allDay: false,
+        calendarId: 'personal', color: null, location: '',
+        recurring: false, recurrenceRule: null, completed: false,
+        priority: 'medium', type: 'Goal Milestone', deadline: true,
+        reminderMinutesBefore: 1440, projectId: m.linkedProjectId || null, habitId: null, goalId: g.id,
+        attachmentsCount: 0, createdAt: g.createdAt, updatedAt: g.updatedAt,
+        googleEventId: null, source: 'goals', isOccurrence: false,
+      });
+    }
+  }
+  return results;
+}
+
 // ---- Source registry — a future Google/Outlook adapter registers here with
-// the exact same { id, getEvents(start, end) } shape. That's the whole seam. ----
+// the exact same { id, getEvents(start, end) } shape. That's the whole seam.
 const SOURCES = [
   { id: 'local', getEvents: (start, end) => events.flatMap((e) => expandOccurrences(e, start, end)) },
   { id: 'projects', getEvents: adaptProjectDeadlines },
+  { id: 'tasks', getEvents: adaptProjectTasks },
   { id: 'habits', getEvents: adaptHabitReminders },
+  { id: 'goals', getEvents: adaptGoalMilestones },
 ];
 
 export function getEventsInRange(rangeStart, rangeEnd) {
