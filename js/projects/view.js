@@ -9,6 +9,11 @@ import { projects, STATUSES, PRIORITIES, allProjectTags, person } from './data.j
 import { getState, setState, getVisibleProjects, invalidateVisibleProjectsCache, resetFilters, SORT_OPTIONS, formatDate, timeAgo } from './state.js';
 import { ProjectCard, ProjectSkeleton, ProjectEmptyState, ProjectHeader, ProjectProgress } from './components.js';
 import { openProjectDialog } from './dialog.js';
+import { goals } from '../goals/data.js';
+import { resources } from '../learning/data.js';
+import { computeResourceProgress } from '../learning/state.js';
+import { getEventsInRange } from '../calendar/repository.js';
+import { daysUntil } from '../date-utils.js';
 
 export function renderProjects(container) {
   container.innerHTML = `
@@ -420,6 +425,15 @@ function recomputeAndSave(p) {
 function renderDetailContent(p) {
   const tasks = p.tasks || [];
   const doneTasks = tasks.filter((t) => t.done).length;
+  
+  // Related items
+  const linkedGoal = p.linkedGoalId ? goals.find((g) => g.id === p.linkedGoalId) : null;
+  const linkedResources = (p.linkedResourceIds || []).map((id) => resources.find((r) => r.id === id)).filter(Boolean);
+  
+  // Scheduled tasks (tasks with due dates)
+  const scheduledTasks = tasks.filter((t) => t.due && !t.done);
+  const overdueTasks = tasks.filter((t) => t.due && !t.done && daysUntil(t.due) < 0);
+  
   const tasksBody = tasks.length
     ? `
       <div class="project-tasks">
@@ -473,6 +487,24 @@ function renderDetailContent(p) {
 
       ${detailSection('Members', `<div class="project-detail-panel__members">${p.members.map((id) => memberRow(id, id === p.owner)).join('')}</div>`)}
 
+      ${(linkedGoal || linkedResources.length) ? detailSection('Related', `
+        <div class="goal-detail-panel__links">
+          ${linkedGoal ? linkRow({ iconName: 'target', label: linkedGoal.title, sub: `Goal \u00b7 ${linkedGoal.status} \u00b7 ${linkedGoal.progress}%`, route: 'goals' }) : ''}
+          ${linkedResources.map((r) => linkRow({ iconName: 'bookOpen', label: r.title, sub: `Learning \u00b7 ${r.type} \u00b7 ${computeResourceProgress(r)}%`, route: 'learning' })).join('')}
+        </div>
+      `) : ''}
+
+      ${overdueTasks.length ? detailSection('Overdue Tasks', `
+        <div class="project-tasks">
+          ${overdueTasks.map((t) => `
+            <div class="project-task">
+              <span class="project-task__title">${t.title}</span>
+              <span class="project-task__due project-task__due--overdue">${Math.abs(daysUntil(t.due))}d overdue</span>
+            </div>
+          `).join('')}
+        </div>
+      `) : ''}
+
       ${detailSection(
         'Timeline',
         `
@@ -525,6 +557,18 @@ function memberRow(id, isOwner) {
 
 function statBlock(value, label) {
   return `<div class="project-detail-panel__stat"><span class="project-detail-panel__stat-value">${value}</span><span class="project-detail-panel__stat-label">${label}</span></div>`;
+}
+
+function linkRow({ iconName, label, sub, route }) {
+  return `
+    <button type="button" class="goal-link" data-link-route="${route}">
+      <span class="goal-link__icon">${icon(iconName, { size: 15 })}</span>
+      <span class="goal-link__body">
+        <span class="goal-link__title">${label}</span>
+        <span class="goal-link__meta">${sub}</span>
+      </span>
+      ${icon('chevronRight', { size: 14, className: 'goal-link__chevron' })}
+    </button>`;
 }
 
 function activityFeed(p) {

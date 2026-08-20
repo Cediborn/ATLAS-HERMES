@@ -316,6 +316,10 @@ function answerFor(raw) {
   if (/(greet|hello|hi|hey|morning|afternoon|evening)/.test(q) && /(^|[^a-z])(hi|hello|hey|morning|afternoon|evening)/.test(q)) {
     return { text: greetingAnswer(), chips: SUGGESTIONS };
   }
+  if (/(overdue|late|behind)/.test(q)) return { text: overdueAnswer(), chips: ['Neglected goals', 'What should I work on next?'] };
+  if (/(neglect|stale|stuck|risk|at risk|blocked)/.test(q)) return { text: neglectedGoalsAnswer(), chips: ['What\u2019s overdue?', 'What should I work on next?'] };
+  if (/(next|what next|what should|priority|priorities|focus)/.test(q)) return { text: whatNextAnswer(), chips: ['This week', 'Overdue'] };
+  if (/(week|weekly|this week|how did)/.test(q)) return { text: weekSummaryAnswer(), chips: ['What should I work on next?', 'Neglected goals'] };
   if (/(task|todo|today|overview|to-do)/.test(q)) return { text: todayTasks(), chips: ['Top goals', 'Best streak', 'My money'] };
   if (/(goal|milestone)/.test(q)) return { text: topGoalAnswer(), chips: ['What\u2019s on today?', 'Currently reading'] };
   if (/(streak|habit)/.test(q)) return { text: streakAnswer(), chips: ['Top goals', 'Coding progress'] };
@@ -323,6 +327,9 @@ function answerFor(raw) {
   if (/(book|read|shelf|nightstand)/.test(q)) return { text: booksAnswer(), chips: ['Coding progress', 'What\u2019s on today?'] };
   if (/(coding|problem|build|leetcode|code)/.test(q)) return { text: codingAnswer(), chips: ['Best streak', 'Top goals'] };
   if (/(event|calendar|meeting|schedule|appointment)/.test(q)) return { text: eventsAnswer(), chips: ['What\u2019s on today?', 'My money'] };
+  if (/(search|find|show|everything about)/.test(q)) return { text: searchAnswer(raw), chips: SUGGESTIONS };
+  // Default: try to search for the query across all modules
+  if (q.length > 2) return { text: searchAnswer(raw), chips: SUGGESTIONS };
   return {
     text: `<p>I\u2019m still learning that one. Try asking about <strong>today\u2019s tasks</strong>, <strong>goals</strong>, <strong>streaks</strong>, <strong>money</strong>, <strong>books</strong>, <strong>coding</strong>, or <strong>events</strong>.</p>`,
     chips: SUGGESTIONS,

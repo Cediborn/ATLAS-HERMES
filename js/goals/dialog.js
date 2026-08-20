@@ -3,6 +3,7 @@
 import { openFormDialog } from '../form-dialog.js';
 import { saveGoals } from '../persistence.js';
 import { goals, createGoalId, GOAL_TYPES, GOAL_STATUSES, GOAL_CATEGORIES, CATEGORY_CONFIG, PRIORITIES } from './data.js';
+import { resources } from '../learning/data.js';
 
 export function openGoalDialog(mode, goal, onSaved) {
   const isEdit = mode === 'edit';
@@ -15,6 +16,7 @@ export function openGoalDialog(mode, goal, onSaved) {
     { key: 'priority', label: 'Priority', type: 'select', options: PRIORITIES, half: true },
     { key: 'startDate', label: 'Start date', type: 'date', half: true },
     { key: 'deadline', label: 'Deadline', type: 'date', half: true },
+    { key: 'linkedResourceIds', label: 'Linked learning', type: 'select', options: [{ value: '', label: 'None' }, ...resources.map((r) => ({ value: r.id, label: r.title }))], half: true },
   ];
 
   openFormDialog({
@@ -42,6 +44,7 @@ export function openGoalDialog(mode, goal, onSaved) {
           milestones: [],
           linkedProjects: [],
           linkedHabits: [],
+          linkedResourceIds: values.linkedResourceIds ? [values.linkedResourceIds] : [],
           favorite: false,
           archived: false,
           createdAt: today,

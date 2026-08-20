@@ -168,6 +168,9 @@
 .task-item__priority--medium { background: var(--color-warning); }
 .task-item__priority--low { background: var(--color-text-tertiary); }
 .task-item__due { margin-left: auto; padding-left: var(--space-8); }
+.task-item__chevron { margin-left: auto; color: var(--color-text-tertiary); opacity: 0; transition: opacity var(--duration-micro) var(--ease-atlas); }
+.task-item:hover .task-item__chevron { opacity: 1; }
+.task-item[data-link-route] { cursor: pointer; }
 
 /* ---- EventItem ---- */
 .event-item__color { width: 8px; height: 8px; border-radius: var(--radius-full); flex-shrink: 0; }

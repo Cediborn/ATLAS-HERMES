@@ -37,6 +37,9 @@ import {
 import { openGoalDialog } from './dialog.js';
 import { projects } from '../projects/data.js';
 import { habits } from '../habits/data.js';
+import { computeStreak } from '../habits/state.js';
+import { resources } from '../learning/data.js';
+import { computeResourceProgress } from '../learning/state.js';
 
 export function renderGoals(container) {
   container.innerHTML = `
@@ -418,8 +421,19 @@ function refreshAll() {
 function renderDetailContent(g) {
   const linkedProjects = g.linkedProjects.map((id) => projects.find((p) => p.id === id)).filter(Boolean);
   const linkedHabits = g.linkedHabits.map((id) => habits.find((h) => h.id === id)).filter(Boolean);
+  const linkedResources = (g.linkedResourceIds || []).map((id) => resources.find((r) => r.id === id)).filter(Boolean);
   const nextMilestone = (g.milestones || []).find((m) => !m.done);
   const progressColor = g.status === 'Completed' ? 'success' : g.status === 'Archived' ? 'neutral' : 'accent';
+
+  // Compute related project progress
+  const relatedProjectProgress = linkedProjects.length
+    ? Math.round(linkedProjects.reduce((sum, p) => sum + (p.progress || 0), 0) / linkedProjects.length)
+    : 0;
+  // Compute related habit streaks
+  const relatedHabitStreaks = linkedHabits.map((h) => ({
+    habit: h,
+    streak: computeStreak(h)
+  }));
 
   return `
     <button type="button" class="icon-btn goal-detail-panel__close" id="goal-detail-close" aria-label="Close panel">${icon('x', { size: 18 })}</button>
@@ -446,13 +460,17 @@ function renderDetailContent(g) {
       ${detailSection('Milestones', milestonesSection(g))}
 
       ${detailSection('Links', `
-        ${linkedProjects.length || linkedHabits.length
+        ${linkedProjects.length || linkedHabits.length || linkedResources.length
           ? `
             <div class="goal-detail-panel__links">
-              ${linkedProjects.map((p) => linkRow({ iconName: 'folder', label: p.title, sub: `Project \u00b7 ${p.status}`, route: 'projects' })).join('')}
-              ${linkedHabits.map((h) => linkRow({ iconName: h.icon, label: h.title, sub: `Habit \u00b7 ${h.category}`, route: 'habits' })).join('')}
+              ${linkedProjects.map((p) => linkRow({ iconName: 'folder', label: p.title, sub: `Project \u00b7 ${p.status} \u00b7 ${p.progress}%`, route: 'projects' })).join('')}
+              ${linkedHabits.map((h) => {
+                const streak = computeStreak(h);
+                return linkRow({ iconName: h.icon, label: h.title, sub: `Habit \u00b7 ${h.category} \u00b7 ${streak.current}d streak`, route: 'habits' });
+              }).join('')}
+              ${linkedResources.map((r) => linkRow({ iconName: 'bookOpen', label: r.title, sub: `Learning \u00b7 ${r.type} \u00b7 ${computeResourceProgress(r)}%`, route: 'learning' })).join('')}
             </div>`
-          : emptyState({ icon: 'layers', title: 'No linked items', description: 'Link projects and habits to see them here.', size: 'sm' })
+          : emptyState({ icon: 'layers', title: 'No linked items', description: 'Link projects, habits, and learning to see them here.', size: 'sm' })
         }`
       )}
 
@@ -464,10 +482,12 @@ function renderDetailContent(g) {
 
       ${detailSection('Statistics', `
         <div class="goal-detail-panel__stats-grid">
-          ${statBlock(`${g.progress}%`, 'Progress')}
+          ${statBlock(`${g.progress}%`, 'Goal Progress')}
           ${statBlock(g.milestonesTotal, 'Milestones')}
           ${statBlock(g.milestonesDone, 'Done')}
-          ${statBlock(g.linkedProjects.length + g.linkedHabits.length, 'Links')}
+          ${linkedProjects.length ? statBlock(`${relatedProjectProgress}%`, 'Project Avg') : ''}
+          ${linkedHabits.length ? statBlock(`${Math.max(...relatedHabitStreaks.map((x) => x.streak.current))}d`, 'Best Streak') : ''}
+          ${statBlock(g.linkedProjects.length + g.linkedHabits.length + linkedResources.length, 'Links')}
         </div>
       `)}
     </div>

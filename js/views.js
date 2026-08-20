@@ -73,6 +73,86 @@ function notesThisWeek() {
   return allNotes.filter((n) => !n.archived && n.updatedAt >= cutoff);
 }
 
+// ---- What Next: prioritized suggestions based on real data ----
+function computeWhatNext() {
+  const today = todayKey();
+  const suggestions = [];
+
+  // 1. Overdue tasks (highest priority)
+  for (const p of allProjects) {
+    for (const t of p.tasks || []) {
+      if (t.done) continue;
+      const due = t.due || p.deadline || null;
+      if (due && due < today) {
+        suggestions.push({
+          priority: 0,
+          icon: 'check',
+          title: t.title,
+          meta: `Overdue · ${p.title}`,
+          link: 'projects',
+        });
+      }
+    }
+  }
+
+  // 2. Tasks due today
+  for (const p of allProjects) {
+    for (const t of p.tasks || []) {
+      if (t.done) continue;
+      const due = t.due || p.deadline || null;
+      if (due && due === today) {
+        suggestions.push({
+          priority: 1,
+          icon: 'check',
+          title: t.title,
+          meta: `Due today · ${p.title}`,
+          link: 'projects',
+        });
+      }
+    }
+  }
+
+  // 3. At-risk/blocked goals
+  for (const g of allGoals.filter((g) => g.status === 'At Risk' || g.status === 'Blocked')) {
+    suggestions.push({
+      priority: 2,
+      icon: 'target',
+      title: g.title,
+      meta: `${g.status} goal`,
+      link: 'goals',
+    });
+  }
+
+  // 4. Upcoming project deadlines (next 3 days)
+  for (const p of allProjects.filter((p) => p.deadline && p.status !== 'Completed' && p.status !== 'Archived')) {
+    const days = daysUntil(p.deadline);
+    if (days !== null && days >= 0 && days <= 3) {
+      suggestions.push({
+        priority: 3,
+        icon: 'folder',
+        title: p.title,
+        meta: days === 0 ? 'Due today' : `Due in ${days}d`,
+        link: 'projects',
+      });
+    }
+  }
+
+  // 5. Incomplete habits today
+  for (const h of allHabits.filter((h) => !h.archived && dayState(h, new Date()) === 'incomplete')) {
+    suggestions.push({
+      priority: 4,
+      icon: h.icon,
+      title: h.title,
+      meta: 'Habit not done yet',
+      link: 'habits',
+    });
+  }
+
+  // Sort by priority, then by deadline urgency
+  suggestions.sort((a, b) => a.priority - b.priority);
+  return suggestions.slice(0, 5);
+}
+
 export function renderDashboard(container) {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
@@ -282,6 +362,21 @@ export function renderDashboard(container) {
         .join('')
     : emptyState({ icon: 'sparkle', title: 'Everything looks good', description: 'No items need your attention right now.', size: 'sm' });
 
+  const whatNextItems = computeWhatNext();
+  const whatNextBody = whatNextItems.length
+    ? whatNextItems
+        .map((item) => `
+          <div class="task-item" tabindex="0" data-link-route="${item.link}">
+            <span class="task-item__check" aria-hidden="true">${icon(item.icon, { size: 11 })}</span>
+            <span class="task-item__body">
+              <span class="task-item__title">${esc(item.title)}</span>
+              <span class="task-item__meta"><span class="task-item__due">${esc(item.meta)}</span></span>
+            </span>
+            ${icon('chevronRight', { size: 14, className: 'task-item__chevron' })}
+          </div>`)
+        .join('')
+    : emptyState({ icon: 'sparkle', title: 'Nothing pressing', description: 'Pick whatever energizes you most.', size: 'sm' });
+
   const welcome = !localStorage.getItem('atlas:welcomeSeen')
     ? `<div class="welcome-banner" role="status">
         <div class="welcome-banner__body"><strong>Welcome to Atlas.</strong> Everything you create is saved locally in your browser — nothing leaves your machine. Press <kbd>Ctrl/⌘</kbd><kbd>K</kbd> to search or jump anywhere.</div>
@@ -306,6 +401,7 @@ export function renderDashboard(container) {
 
       <div class="dashboard__grid">
         <div class="dashboard__col dashboard__col--left">
+          ${SectionCard({ title: 'What Next', description: 'Prioritized suggestions', content: whatNextBody })}
           ${SectionCard({ title: 'Needs Attention', description: 'Items requiring your focus', content: attentionBody })}
           ${SectionCard({ title: "Today's Overview", action: sectionAction('projects'), content: todayBody })}
           ${SectionCard({ title: 'Recent Projects', action: sectionAction('projects'), content: projectsBody })}
@@ -329,6 +425,14 @@ export function renderDashboard(container) {
       dismissWelcome.closest('.welcome-banner')?.remove();
     });
   }
+
+  // What Next section — click to navigate to related module
+  container.querySelectorAll('[data-link-route]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const route = el.dataset.linkRoute;
+      if (route) window.location.hash = `/${route}`;
+    });
+  });
 
   // Task checkbox toggle — mutates the real project task and persists.
   container.querySelectorAll('.task-item').forEach((row) => {

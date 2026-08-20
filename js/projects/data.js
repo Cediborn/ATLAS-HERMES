@@ -31,6 +31,7 @@ export function newProjectDefaults() {
     createdAt: today, updatedAt: today, lastActivity: today,
     tags: [], tasks: [], taskCount: 0, completedTaskCount: 0,
     attachmentsCount: 0, notesCount: 0, favorite: false, pinned: false, cover: false,
+    linkedGoalId: null, linkedResourceIds: [],
   };
 }
 
