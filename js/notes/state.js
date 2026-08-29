@@ -1,14 +1,12 @@
-// Atlas — Notes page state. Same shape as projects/state.js on purpose
-// (filter/sort as pure functions, page-scoped state, a memoized selector) —
-// that pattern already works, so Notes reuses it instead of inventing a new one.
+// Atlas — Notes page state.
+// Uses shared list-state.js for filtering/sorting/memoization.
+// This file only defines Notes-specific config and enrichments.
 
 import { formatDate, timeAgo } from '../date-utils.js';
+import { createListState, createFilterFn, createSortFn } from '../list-state.js';
 
-export { formatDate, timeAgo };
-
-const listeners = new Set();
-
-let state = {
+// ---- Page-scoped state ----
+const initialState = {
   search: '',
   categoryFilter: new Set(),
   tagFilter: new Set(),
@@ -18,24 +16,6 @@ let state = {
   sortBy: 'recentlyUpdated',
   viewMode: 'grid', // 'grid' | 'list' — both fully built this time
 };
-
-export function getState() {
-  return state;
-}
-
-export function setState(patch) {
-  state = { ...state, ...patch };
-  listeners.forEach((fn) => fn(state));
-}
-
-export function subscribe(fn) {
-  listeners.add(fn);
-  return () => listeners.delete(fn);
-}
-
-export function resetFilters() {
-  setState({ search: '', categoryFilter: new Set(), tagFilter: new Set(), favoritesOnly: false, pinnedOnly: false });
-}
 
 // ---- Content metrics (pure — used by both the editor footer and, if ever
 // needed, a card) ----
@@ -53,17 +33,15 @@ export function readingTime(text) {
 }
 
 // ---- Filtering (pure) ----
-export function filterNotes(list, f) {
+function matchesNote(n, f) {
   const q = f.search.trim().toLowerCase();
-  return list.filter((n) => {
-    if (!f.showArchived && n.archived) return false;
-    if (q && !n.title.toLowerCase().includes(q) && !n.content.toLowerCase().includes(q)) return false;
-    if (f.categoryFilter.size && !f.categoryFilter.has(n.category)) return false;
-    if (f.tagFilter.size && !n.tags.some((t) => f.tagFilter.has(t))) return false;
-    if (f.favoritesOnly && !n.favorite) return false;
-    if (f.pinnedOnly && !n.pinned) return false;
-    return true;
-  });
+  if (!f.showArchived && n.archived) return false;
+  if (q && !n.title.toLowerCase().includes(q) && !n.content.toLowerCase().includes(q)) return false;
+  if (f.categoryFilter.size && !f.categoryFilter.has(n.category)) return false;
+  if (f.tagFilter.size && !n.tags.some((t) => f.tagFilter.has(t))) return false;
+  if (f.favoritesOnly && !n.favorite) return false;
+  if (f.pinnedOnly && !n.pinned) return false;
+  return true;
 }
 
 // ---- Sorting (pure) — pinned notes always float to the top as a group,
@@ -84,14 +62,7 @@ function getComparator(sortBy) {
   }
 }
 
-export function sortNotes(list, sortBy) {
-  const compare = getComparator(sortBy);
-  const pinned = list.filter((n) => n.pinned).sort(compare);
-  const rest = list.filter((n) => !n.pinned).sort(compare);
-  return [...pinned, ...rest];
-}
-
-export const SORT_OPTIONS = [
+const SORT_OPTIONS = [
   { id: 'recentlyUpdated', label: 'Recently updated' },
   { id: 'recentlyCreated', label: 'Recently created' },
   { id: 'oldest', label: 'Oldest first' },
@@ -99,15 +70,9 @@ export const SORT_OPTIONS = [
   { id: 'category', label: 'Category' },
 ];
 
-// ---- Memoized filter+sort combination, with an explicit invalidation hook
-// for when a note's own fields mutate (pin/favorite/archive toggle,
-// autosave) — Projects shipped without this at first and it caused a real
-// stale-list bug, so it's built in from the start here. ----
-let lastKey = null;
-let lastResult = null;
-
-export function getVisibleNotes(allNotes, f) {
-  const key = JSON.stringify({
+// ---- Build cache key ----
+function buildKey(f, n) {
+  return {
     search: f.search,
     cat: [...f.categoryFilter].sort(),
     tags: [...f.tagFilter].sort(),
@@ -115,14 +80,39 @@ export function getVisibleNotes(allNotes, f) {
     pin: f.pinnedOnly,
     arch: f.showArchived,
     sort: f.sortBy,
-    n: allNotes.length,
-  });
-  if (key === lastKey) return lastResult;
-  lastKey = key;
-  lastResult = sortNotes(filterNotes(allNotes, f), f.sortBy);
-  return lastResult;
+    n,
+  };
 }
 
-export function invalidateVisibleNotesCache() {
-  lastKey = null;
-}
+// ---- Create the shared list state ----
+const listState = createListState({
+  moduleName: 'notes',
+  initialState,
+  sortOptions: SORT_OPTIONS,
+  filterFn: createFilterFn(matchesNote),
+  sortFn: (list, sortBy) => {
+    const compare = getComparator(sortBy);
+    const pinned = list.filter((n) => n.pinned).sort(compare);
+    const rest = list.filter((n) => !n.pinned).sort(compare);
+    return [...pinned, ...rest];
+  },
+  buildKey,
+  resetKeys: ['search', 'categoryFilter', 'tagFilter', 'favoritesOnly', 'pinnedOnly', 'showArchived'],
+});
+
+// ---- Re-export standard API ----
+export const {
+  getState,
+  setState,
+  subscribe,
+  resetFilters,
+  filter: filterNotes,
+  sort: sortNotes,
+  getVisible: getVisibleNotes,
+  invalidateCache: invalidateVisibleNotesCache,
+} = listState;
+
+export { SORT_OPTIONS };
+
+// ---- Re-export date utils for view.js ----
+export { formatDate, timeAgo };

@@ -1,18 +1,17 @@
-// Atlas — Calendar page state. Same discipline as Projects/Notes: pure
-// functions for anything computable, a small page-local store for anything
-// that's genuinely UI state (selected date, active view, open popover/dialog —
-// never mixed with the event data itself, which lives in repository.js).
+// Atlas — Calendar page state.
+// Uses shared list-state.js (createCalendarState variant) for filtering/memoization.
+// This file only defines Calendar-specific config.
 
-import { getEventsInRange } from './repository.js';
+import { filterEvents as repoFilterEvents, getEventsInRange } from './repository.js';
 import { dateKey, todayDate, todayKey, startOfMonth, endOfMonth, addMonths, monthGridDays } from '../date-utils.js';
+import { createCalendarState, defaultBuildKey } from '../list-state.js';
 
 // Re-exported so every file that already does `import { monthGridDays, ... }
 // from './state.js'` keeps working unchanged — only the implementation moved.
 export { dateKey, todayDate, todayKey, startOfMonth, endOfMonth, addMonths, monthGridDays };
 
-const listeners = new Set();
-
-let state = {
+// ---- Page-scoped state ----
+const initialState = {
   selectedDate: todayKey(),
   visibleMonth: startOfMonth(new Date()).toISOString(),
   currentView: 'month', // 'month' | 'agenda' — week/day deferred
@@ -31,23 +30,10 @@ let state = {
   dialogEventId: null,
 };
 
-export function getState() {
-  return state;
-}
-export function setState(patch) {
-  state = { ...state, ...patch };
-  listeners.forEach((fn) => fn(state));
-}
-export function subscribe(fn) {
-  listeners.add(fn);
-  return () => listeners.delete(fn);
-}
-export function resetFilters() {
-  setState({
-    search: '', calendarFilter: new Set(), typeFilter: new Set(), priorityFilter: new Set(),
-    completionFilter: 'all', dateRangeFilter: 'all', hasReminderOnly: false, recurringOnly: false, allDayOnly: false,
-  });
-}
+const resetKeys = [
+  'search', 'calendarFilter', 'typeFilter', 'priorityFilter',
+  'completionFilter', 'dateRangeFilter', 'hasReminderOnly', 'recurringOnly', 'allDayOnly',
+];
 
 // ---- Date helpers (pure) ----
 export function isSameDay(a, b) {
@@ -76,7 +62,7 @@ export function groupByDate(occurrences) {
 }
 
 // ---- Filtering (pure) ----
-export function filterEvents(occurrences, f) {
+function filterEvents(occurrences, f) {
   const q = f.search.trim().toLowerCase();
   const today = todayDate();
   const weekEnd = new Date(today);
@@ -107,7 +93,7 @@ export function filterEvents(occurrences, f) {
 }
 
 function escapeHtmlLite(s) {
-  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return String(s).replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>');
 }
 
 export function highlightMatch(text, query) {
@@ -118,27 +104,43 @@ export function highlightMatch(text, query) {
   return `${escapeHtmlLite(text.slice(0, idx))}<mark class="search-highlight">${escapeHtmlLite(text.slice(idx, idx + q.length))}</mark>${escapeHtmlLite(text.slice(idx + q.length))}`;
 }
 
-// ---- Memoized selector: fetch the range from the repository, then filter.
-// Invalidated explicitly wherever event data mutates (create/update/delete/
-// drag-reschedule) — Projects shipped without this at first and it caused a
-// real bug, so every module since builds it in from the start. ----
-let lastKey = null;
-let lastResult = null;
-
-export function getVisibleEvents(rangeStart, rangeEnd) {
-  const f = state;
-  const key = JSON.stringify({
-    start: rangeStart.toISOString(), end: rangeEnd.toISOString(),
-    search: f.search, cal: [...f.calendarFilter].sort(), type: [...f.typeFilter].sort(),
-    pri: [...f.priorityFilter].sort(), comp: f.completionFilter, range: f.dateRangeFilter,
-    rem: f.hasReminderOnly, rec: f.recurringOnly, allDay: f.allDayOnly,
-  });
-  if (key === lastKey) return lastResult;
-  lastKey = key;
-  lastResult = filterEvents(getEventsInRange(rangeStart, rangeEnd), f);
-  return lastResult;
+// ---- Build cache key ----
+function buildKey(f, rangeStart, rangeEnd) {
+  return {
+    start: rangeStart.toISOString(),
+    end: rangeEnd.toISOString(),
+    search: f.search,
+    cal: [...f.calendarFilter].sort(),
+    type: [...f.typeFilter].sort(),
+    pri: [...f.priorityFilter].sort(),
+    comp: f.completionFilter,
+    range: f.dateRangeFilter,
+    rem: f.hasReminderOnly,
+    rec: f.recurringOnly,
+    allDay: f.allDayOnly,
+  };
 }
 
-export function invalidateVisibleEventsCache() {
-  lastKey = null;
-}
+// ---- Create the shared calendar state ----
+const calendarState = createCalendarState({
+  moduleName: 'calendar',
+  initialState,
+  sortOptions: [], // Calendar doesn't use SORT_OPTIONS
+  filterFn: filterEvents,
+  buildKey,
+  resetKeys,
+});
+
+// ---- Re-export standard API ----
+export const {
+  getState,
+  setState,
+  subscribe,
+  resetFilters,
+  filter: filterEventsState,
+  getVisible: getVisibleEvents,
+  invalidateCache: invalidateVisibleEventsCache,
+} = calendarState;
+
+// Re-export the local filterEvents function for other modules
+export { filterEvents };

@@ -1,14 +1,12 @@
-// Atlas — Coding derived state. Mirrors books/state.js: everything observable
-// is computed here (never stored on the raw items), and the visible list is
-// memoized behind a cache that invalidates whenever the raw list is re-sorted
-// or re-filtered.
+// Atlas — Coding derived state.
+// Uses shared list-state.js for filtering/sorting/memoization.
+// This file only defines Coding-specific config and enrichments.
 
 import { codingItems, practiceSessions, DIFFICULTY_CONFIG, LANGUAGE_CONFIG } from './data.js';
+import { createListState, createFilterFn, createSortFn } from '../list-state.js';
 
-// ---- Page-scoped state (same pattern as books/state.js) ----
-const listeners = new Set();
-
-let state = {
+// ---- Page-scoped state ----
+const initialState = {
   search: '',
   statusFilter: new Set(),
   difficultyFilter: new Set(),
@@ -18,38 +16,14 @@ let state = {
   viewMode: 'grid', // 'grid' | 'list'
 };
 
-export function getState() {
-  return state;
-}
-
-export function setState(patch) {
-  state = { ...state, ...patch };
-  listeners.forEach((fn) => fn(state));
-}
-
-export function subscribe(fn) {
-  listeners.add(fn);
-  return () => listeners.delete(fn);
-}
-
-export function resetFilters() {
-  setState({
-    search: '',
-    statusFilter: new Set(),
-    difficultyFilter: new Set(),
-    languageFilter: new Set(),
-    favoritesOnly: false,
-  });
-}
-
-export const SORT_OPTIONS = {
+const SORT_OPTIONS = {
   'Recently practiced': { key: 'lastPracticed', dir: 'desc', nulls: 'last' },
   'Most time spent': { key: 'timeSpentMin', dir: 'desc', nulls: 'last' },
   'Title A→Z': { key: 'title', dir: 'asc' },
   'Newest first': { key: 'id', dir: 'desc' },
 };
 
-export const FILTER_OPTIONS = {
+const FILTER_OPTIONS = {
   status: Object.keys({ Backlog: 1, 'In Progress': 1, Solved: 1, 'On Hold': 1 }),
   difficulty: Object.keys(DIFFICULTY_CONFIG),
   language: Object.keys(LANGUAGE_CONFIG),
@@ -75,8 +49,6 @@ export function enrichItem(c) {
 }
 
 // ---- Practice streak ----
-// Consecutive calendar days ending today or yesterday (a streak survives a
-// missed day until the end of that day). Sessions are de-duplicated by date.
 export function computePracticeStreak(sessions = practiceSessions) {
   const days = [...new Set(sessions.map((s) => s.date))].sort();
   if (days.length === 0) return 0;
@@ -104,54 +76,71 @@ export function computePracticeStreak(sessions = practiceSessions) {
   return streak;
 }
 
-// ---- Memoized visible list ----
-const visibleCache = { key: null, result: null };
-export function invalidateVisibleCache() {
-  visibleCache.key = null;
-  visibleCache.result = null;
+// ---- Filtering (pure) ----
+function matchesCoding(c, f) {
+  const q = f.search.trim().toLowerCase();
+  if (q && !c.title.toLowerCase().includes(q) && !c.source.toLowerCase().includes(q)) return false;
+  if (f.statusFilter.size && !f.statusFilter.has(c.status)) return false;
+  if (f.difficultyFilter.size && !f.difficultyFilter.has(c.difficulty)) return false;
+  if (f.languageFilter.size && !c.languages.some((l) => f.languageFilter.has(l))) return false;
+  if (f.favoritesOnly && !c.favorite) return false;
+  return true;
 }
 
-export function getVisibleItems(items = codingItems, state = {}) {
-  const filters = {
-    status: state.statusFilter?.size ? [...state.statusFilter] : null,
-    difficulty: state.difficultyFilter?.size ? [...state.difficultyFilter] : null,
-    language: state.languageFilter?.size ? [...state.languageFilter] : null,
-    favoritesOnly: state.favoritesOnly || false,
-  };
-  const sortKey = state.sortBy || 'Recently practiced';
-  const search = state.search || '';
-  const cacheKey = JSON.stringify([filters, sortKey, search]);
-  if (visibleCache.key === cacheKey) return visibleCache.result;
-
-  let list = items.map(enrichItem);
-
-  if (search.trim()) {
-    const q = search.trim().toLowerCase();
-    list = list.filter((c) => c.title.toLowerCase().includes(q) || c.source.toLowerCase().includes(q));
-  }
-  if (filters.status) list = list.filter((c) => filters.status.includes(c.status));
-  if (filters.difficulty) list = list.filter((c) => filters.difficulty.includes(c.difficulty));
-  if (filters.language) list = list.filter((c) => c.languages.some((l) => filters.language.includes(l)));
-  if (filters.favoritesOnly) list = list.filter((c) => c.favorite);
-
+// ---- Sorting (pure) ----
+function sortFn(list, sortKey) {
   const opt = SORT_OPTIONS[sortKey];
-  if (opt) {
-    list = [...list].sort((a, b) => {
-      const va = a[opt.key];
-      const vb = b[opt.key];
-      if (va == null && vb == null) return 0;
-      if (va == null) return opt.nulls === 'last' ? 1 : -1;
-      if (vb == null) return opt.nulls === 'last' ? -1 : 1;
-      const cmp = typeof va === 'string' ? va.localeCompare(vb) : va - vb;
-      return opt.dir === 'asc' ? cmp : -cmp;
-    });
-  }
-
-  const result = { list, total: list.length };
-  visibleCache.key = cacheKey;
-  visibleCache.result = result;
-  return result;
+  if (!opt) return list;
+  return [...list].sort((a, b) => {
+    const va = a[opt.key];
+    const vb = b[opt.key];
+    if (va == null && vb == null) return 0;
+    if (va == null) return opt.nulls === 'last' ? 1 : -1;
+    if (vb == null) return opt.nulls === 'last' ? -1 : 1;
+    const cmp = typeof va === 'string' ? va.localeCompare(vb) : va - vb;
+    return opt.dir === 'asc' ? cmp : -cmp;
+  });
 }
+
+// ---- Build cache key ----
+function buildKey(f) {
+  return {
+    filters: {
+      status: f.statusFilter.size ? [...f.statusFilter].sort() : null,
+      difficulty: f.difficultyFilter.size ? [...f.difficultyFilter].sort() : null,
+      language: f.languageFilter.size ? [...f.languageFilter].sort() : null,
+      favoritesOnly: f.favoritesOnly || false,
+    },
+    sortKey: f.sortBy || 'Recently practiced',
+    search: f.search || '',
+  };
+}
+
+// ---- Create the shared list state ----
+const listState = createListState({
+  moduleName: 'coding',
+  initialState,
+  sortOptions: Object.entries(SORT_OPTIONS).map(([id]) => ({ id, label: id })),
+  filterFn: createFilterFn(matchesCoding),
+  sortFn,
+  enrichFn: enrichItem,
+  buildKey,
+  resetKeys: ['search', 'statusFilter', 'difficultyFilter', 'languageFilter', 'favoritesOnly'],
+});
+
+// ---- Re-export standard API ----
+export const {
+  getState,
+  setState,
+  subscribe,
+  resetFilters,
+  filter: filterCodingItems,
+  sort: sortCodingItems,
+  getVisible: getVisibleItems,
+  invalidateCache: invalidateVisibleCache,
+} = listState;
+
+export { SORT_OPTIONS, FILTER_OPTIONS };
 
 // ---- Stats ----
 export function computeCodingStats(items = codingItems) {

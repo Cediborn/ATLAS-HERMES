@@ -1,17 +1,16 @@
-// Atlas — Habits page state. Same discipline as Projects/Calendar: pure
-// functions for anything computable, a small page-local store for anything
-// that's genuinely UI state. Streak/stats/heatmap math lives here rather
-// than in data.js, mirroring calendar/repository.js (raw+adapt) vs
-// calendar/state.js (derive+UI state).
+// Atlas — Habits page state.
+// Uses shared list-state.js for filtering/sorting/memoization.
+// This file only defines Habits-specific config and enrichments.
 
-import { habits, completions, isDueOn, habitById, createHabitId, CATEGORY_CONFIG, FREQUENCY_CONFIG, WEEKDAY_LABELS, STREAK_MILESTONES } from './data.js';
 import { dateKey, todayDate, todayKey, monthGridDays } from '../date-utils.js';
+import { createListState, createFilterFn, createSortFn } from '../list-state.js';
+import { CATEGORY_CONFIG, FREQUENCY_CONFIG, WEEKDAY_LABELS, STREAK_MILESTONES } from './data.js';
 import { saveHabits, saveCompletions } from '../persistence.js';
 
 // ---- Completion index — built from data.js's flat list, then mutated
 // directly (same "no separate copy" rule as calendar/repository.js's local
 // events array: this Map IS the live source of truth from here on).
-// Rebuilt whenever persistence hydrates the arrays from IndexedDB. ----
+// Rebuilt whenever persistence hydrates the arrays from IndexedDB.
 const completionIndex = new Map(); // habitId -> Map(dateKey -> 'done'|'skipped')
 
 export function rebuildCompletionIndex() {
@@ -21,8 +20,6 @@ export function rebuildCompletionIndex() {
     completionIndex.get(c.habitId).set(c.date, c.status);
   }
 }
-
-rebuildCompletionIndex();
 
 export function getStatusOn(habitId, dateKeyStr) {
   return completionIndex.get(habitId)?.get(dateKeyStr) || null;
@@ -45,7 +42,7 @@ export function setCompletionStatus(habitId, dateKeyStr, status) {
     if (existingIdx !== -1) completions[existingIdx].status = status;
     else completions.push({ habitId, date: dateKeyStr, status });
   }
-  invalidateVisibleHabitsCache();
+  invalidateCache(); // invalidate visible habits cache
   saveCompletions();
 }
 
@@ -60,6 +57,8 @@ export function cycleCompletion(habitId, dateKeyStr) {
   return next;
 }
 
+import { habits, completions, isDueOn, habitById, createHabitId } from './data.js';
+
 // 'locked' = not due this day at all (no actionable control shown);
 // 'missed' is inferred, never stored, for any past due day with no entry.
 export function dayState(habit, date) {
@@ -72,9 +71,6 @@ export function dayState(habit, date) {
 }
 
 // ---- Streaks ----
-// Safety valve against an unbounded walk (same style/purpose as
-// calendar/repository.js's MAX_ITERATIONS) — not a real ceiling for any
-// habit's actual history.
 const STREAK_WALK_SAFETY = 400;
 
 export function computeStreak(habit) {
@@ -174,9 +170,7 @@ export function computeTrend(habit) {
   return thisWeek - lastWeek;
 }
 
-// ---- Dashboard-level aggregate stats (the 12 metrics on the page header /
-// HabitDashboard). Each is computed, not stored — definitions noted inline
-// since a couple of these could otherwise look like duplicates of each other. ----
+// ---- Dashboard-level aggregate stats ----
 export function computeDashboardStats() {
   const active = habits.filter((h) => !h.archived);
   const today = todayDate();
@@ -235,16 +229,15 @@ export function computeDashboardStats() {
     currentStreak,
     longestStreak,
     totalCompletions,
-    skippedHabits, // skipped entries in the last 30 days
-    missedHabits, // inferred-missed due-days in the last 30 days
+    skippedHabits,
+    missedHabits,
     archivedHabits: habits.length - active.length,
-    completionPercentage: windowPct(90), // all-time-within-generated-window rate — deliberately a wider window than "Monthly" so the two numbers aren't the same stat twice
-    consistencyScore, // % of active habits currently on a streak of 3+ days
+    completionPercentage: windowPct(90),
+    consistencyScore,
   };
 }
 
-// ---- Weekly overview — rolling 7 days ending today (not calendar Mon-Sun,
-// so it's always meaningful regardless of what day "today" is) ----
+// ---- Weekly overview ----
 export function buildWeeklyOverview() {
   const today = todayDate();
   const todayK = todayKey();
@@ -273,7 +266,7 @@ export function buildWeeklyOverview() {
 
 // ---- Monthly heatmap ----
 export function buildHeatmapMonth(monthDate) {
-  const grid = monthGridDays(monthDate); // shared with Calendar — see date-utils.js
+  const grid = monthGridDays(monthDate);
   const todayK = todayKey();
   return grid.map((cell) => {
     if (!cell.inCurrentMonth || cell.key > todayK) {
@@ -317,8 +310,8 @@ export function formatReminderTime(hhmm) {
   return `${h12}:${String(m).padStart(2, '0')} ${period}`;
 }
 
-// ---- Page UI state (search/filter/sort — view state, not app state) ----
-let state = {
+// ---- Page-scoped state ----
+const initialState = {
   search: '',
   categoryFilter: new Set(),
   priorityFilter: new Set(),
@@ -326,62 +319,8 @@ let state = {
   favoritesOnly: false,
   sortBy: 'currentStreak',
 };
-const listeners = new Set();
 
-export function getState() {
-  return state;
-}
-export function setState(patch) {
-  state = { ...state, ...patch };
-  listeners.forEach((fn) => fn(state));
-}
-export function subscribe(fn) {
-  listeners.add(fn);
-  return () => listeners.delete(fn);
-}
-export function resetFilters() {
-  setState({ search: '', categoryFilter: new Set(), priorityFilter: new Set(), favoritesOnly: false });
-}
-
-export function filterHabits(list, f) {
-  const q = f.search.trim().toLowerCase();
-  return list.filter((h) => {
-    if (f.statusFilter === 'active' && h.archived) return false;
-    if (f.statusFilter === 'archived' && !h.archived) return false;
-    if (q && !h.title.toLowerCase().includes(q) && !h.description.toLowerCase().includes(q) && !h.tags.some((t) => t.toLowerCase().includes(q))) return false;
-    if (f.categoryFilter.size && !f.categoryFilter.has(h.category)) return false;
-    if (f.priorityFilter.size && !f.priorityFilter.has(h.priority)) return false;
-    if (f.favoritesOnly && !h.favorite) return false;
-    return true;
-  });
-}
-
-const PRIORITY_ORDER = { High: 0, Medium: 1, Low: 2 };
-
-export function sortHabits(list, sortBy) {
-  const arr = [...list];
-  switch (sortBy) {
-    case 'alphabetical':
-      return arr.sort((a, b) => a.title.localeCompare(b.title));
-    case 'completionRate':
-      return arr.sort((a, b) => computeSuccessRate(b) - computeSuccessRate(a));
-    case 'longestStreak':
-      return arr.sort((a, b) => computeStreak(b).longest - computeStreak(a).longest);
-    case 'createdAt':
-      return arr.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    case 'updatedAt':
-      return arr.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
-    case 'priority':
-      return arr.sort((a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority]);
-    case 'category':
-      return arr.sort((a, b) => a.category.localeCompare(b.category));
-    case 'currentStreak':
-    default:
-      return arr.sort((a, b) => computeStreak(b).current - computeStreak(a).current);
-  }
-}
-
-export const SORT_OPTIONS = [
+const SORT_OPTIONS = [
   { id: 'currentStreak', label: 'Current streak' },
   { id: 'longestStreak', label: 'Longest streak' },
   { id: 'completionRate', label: 'Completion %' },
@@ -392,29 +331,75 @@ export const SORT_OPTIONS = [
   { id: 'updatedAt', label: 'Recently updated' },
 ];
 
-// Memoized filter+sort — invalidated explicitly wherever habit data mutates
-// (Projects shipped without this at first and it caused a real stale-cache
-// bug, so every module since builds it in from the start).
-let lastKey = null;
-let lastResult = null;
-
-export function getVisibleHabits(allHabits, f) {
-  const key = JSON.stringify({
-    search: f.search, cat: [...f.categoryFilter].sort(), pri: [...f.priorityFilter].sort(),
-    status: f.statusFilter, fav: f.favoritesOnly, sort: f.sortBy, n: allHabits.length,
-  });
-  if (key === lastKey) return lastResult;
-  lastKey = key;
-  lastResult = sortHabits(filterHabits(allHabits, f), f.sortBy);
-  return lastResult;
+// ---- Filtering (pure) ----
+function matchesHabit(h, f) {
+  const q = f.search.trim().toLowerCase();
+  if (f.statusFilter === 'active' && h.archived) return false;
+  if (f.statusFilter === 'archived' && !h.archived) return false;
+  if (q && !h.title.toLowerCase().includes(q) && !h.description.toLowerCase().includes(q) && !h.tags.some((t) => t.toLowerCase().includes(q))) return false;
+  if (f.categoryFilter.size && !f.categoryFilter.has(h.category)) return false;
+  if (f.priorityFilter.size && !f.priorityFilter.has(h.priority)) return false;
+  if (f.favoritesOnly && !h.favorite) return false;
+  return true;
 }
 
-export function invalidateVisibleHabitsCache() {
-  lastKey = null;
+// ---- Sorting (pure) ----
+const PRIORITY_ORDER = { High: 0, Medium: 1, Low: 2 };
+
+const comparators = {
+  alphabetical: (a, b) => a.title.localeCompare(b.title),
+  completionRate: (a, b) => computeSuccessRate(b) - computeSuccessRate(a),
+  longestStreak: (a, b) => computeStreak(b).longest - computeStreak(a).longest,
+  createdAt: (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
+  updatedAt: (a, b) => new Date(b.updatedAt) - new Date(a.updatedAt),
+  priority: (a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority],
+  category: (a, b) => a.category.localeCompare(b.category),
+  currentStreak: (a, b) => computeStreak(b).current - computeStreak(a).current,
+};
+
+// ---- Build cache key ----
+function buildKey(f, n) {
+  return {
+    search: f.search,
+    cat: [...f.categoryFilter].sort(),
+    pri: [...f.priorityFilter].sort(),
+    status: f.statusFilter,
+    fav: f.favoritesOnly,
+    sort: f.sortBy,
+    n,
+  };
 }
 
-// ---- CRUD — mutates data.js's own arrays directly, same pattern as
-// calendar/repository.js's createLocalEvent/deleteLocalEvent ----
+// ---- Create the shared list state ----
+const listState = createListState({
+  moduleName: 'habits',
+  initialState,
+  sortOptions: SORT_OPTIONS,
+  filterFn: createFilterFn(matchesHabit),
+  sortFn: createSortFn(comparators, 'currentStreak'),
+  buildKey,
+  resetKeys: ['search', 'categoryFilter', 'priorityFilter', 'favoritesOnly', 'statusFilter'],
+});
+
+// ---- Re-export standard API ----
+export const {
+  getState,
+  setState,
+  subscribe,
+  resetFilters,
+  filter: filterHabits,
+  sort: sortHabits,
+  getVisible: getVisibleHabits,
+  invalidateCache: invalidateVisibleHabitsCache,
+} = listState;
+
+export { SORT_OPTIONS };
+
+// ---- Re-export date utils and streak helpers for view.js ----
+export { dateKey, todayDate, todayKey, monthGridDays };
+export { CATEGORY_CONFIG, FREQUENCY_CONFIG, WEEKDAY_LABELS, STREAK_MILESTONES };
+
+// ---- CRUD — mutates data.js's own arrays directly ----
 export function createHabit(data) {
   const now = todayKey();
   const habit = {
@@ -424,7 +409,7 @@ export function createHabit(data) {
     id: createHabitId(), createdAt: now, updatedAt: now,
   };
   habits.push(habit);
-  invalidateVisibleHabitsCache();
+  invalidateCache();
   saveHabits();
   return habit;
 }
@@ -433,7 +418,7 @@ export function updateHabit(id, patch) {
   const h = habitById(id);
   if (!h) return null;
   Object.assign(h, patch, { updatedAt: todayKey() });
-  invalidateVisibleHabitsCache();
+  invalidateCache();
   saveHabits();
   return h;
 }
@@ -441,14 +426,11 @@ export function updateHabit(id, patch) {
 export function deleteHabit(id) {
   const idx = habits.findIndex((h) => h.id === id);
   if (idx !== -1) habits.splice(idx, 1);
-  // Drop this habit's completion history too — orphaned completions would
-  // otherwise survive forever and inflate nothing, but would still be written
-  // back on every save.
   completionIndex.delete(id);
   for (let i = completions.length - 1; i >= 0; i -= 1) {
     if (completions[i].habitId === id) completions.splice(i, 1);
   }
-  invalidateVisibleHabitsCache();
+  invalidateCache();
   saveHabits();
   saveCompletions();
 }
@@ -459,7 +441,7 @@ export function duplicateHabit(id) {
   const now = todayKey();
   const copy = { ...h, id: createHabitId(), title: `${h.title} (copy)`, favorite: false, createdAt: now, updatedAt: now };
   habits.push(copy);
-  invalidateVisibleHabitsCache();
+  invalidateCache();
   saveHabits();
   return copy;
 }
@@ -468,7 +450,7 @@ export function toggleFavorite(id) {
   const h = habitById(id);
   if (h) {
     h.favorite = !h.favorite;
-    invalidateVisibleHabitsCache();
+    invalidateCache();
     saveHabits();
   }
   return h;
@@ -478,10 +460,8 @@ export function toggleArchived(id) {
   const h = habitById(id);
   if (h) {
     h.archived = !h.archived;
-    invalidateVisibleHabitsCache();
+    invalidateCache();
     saveHabits();
   }
   return h;
 }
-
-export { CATEGORY_CONFIG };

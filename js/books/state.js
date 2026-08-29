@@ -1,12 +1,12 @@
-// Atlas — Books page state. Page-scoped (not the global store), same shape as
-// goals/state.js: progress/filtering/sorting/stats are pure functions, nothing
-// here touches the DOM.
+// Atlas — Books page state.
+// Uses shared list-state.js for filtering/sorting/memoization.
+// This file only defines Books-specific config and enrichments.
 
 import { formatDate, timeAgo, daysUntil } from '../date-utils.js';
+import { createListState, createFilterFn, createSortFn } from '../list-state.js';
 
-const listeners = new Set();
-
-let state = {
+// ---- Page-scoped state ----
+const initialState = {
   search: '',
   genreFilter: new Set(),
   statusFilter: new Set(),
@@ -15,33 +15,13 @@ let state = {
   viewMode: 'grid', // 'grid' | 'list'
 };
 
-export function getState() {
-  return state;
-}
-
-export function setState(patch) {
-  state = { ...state, ...patch };
-  listeners.forEach((fn) => fn(state));
-}
-
-export function subscribe(fn) {
-  listeners.add(fn);
-  return () => listeners.delete(fn);
-}
-
-export function resetFilters() {
-  setState({ search: '', genreFilter: new Set(), statusFilter: new Set(), favoritesOnly: false });
-}
-
-export { formatDate, timeAgo, daysUntil };
-
 // ---- Progress — derived from pages read, never stored ----
-export function computeBookProgress(book) {
+function computeBookProgress(book) {
   if (!book.pages) return 0;
   return Math.round((Math.min(book.pagesRead, book.pages) / book.pages) * 100);
 }
 
-export function pagesRemaining(book) {
+function pagesRemaining(book) {
   return Math.max(0, book.pages - (book.pagesRead || 0));
 }
 
@@ -55,41 +35,27 @@ export function enrichBook(book) {
 }
 
 // ---- Filtering (pure) ----
-export function filterBooks(list, f) {
+function matchesBook(b, f) {
   const q = f.search.trim().toLowerCase();
-  return list.filter((b) => {
-    if (q && !b.title.toLowerCase().includes(q) && !b.author.toLowerCase().includes(q)) return false;
-    if (f.favoritesOnly && !b.favorite) return false;
-    if (f.genreFilter.size && !f.genreFilter.has(b.genre)) return false;
-    if (f.statusFilter.size && !f.statusFilter.has(b.status)) return false;
-    return true;
-  });
+  if (q && !b.title.toLowerCase().includes(q) && !b.author.toLowerCase().includes(q)) return false;
+  if (f.favoritesOnly && !b.favorite) return false;
+  if (f.genreFilter.size && !f.genreFilter.has(b.genre)) return false;
+  if (f.statusFilter.size && !f.statusFilter.has(b.status)) return false;
+  return true;
 }
 
 // ---- Sorting (pure) ----
-export function sortBooks(list, sortBy) {
-  const arr = [...list];
-  const byDateDesc = (key) => (a, b) => new Date(b[key] || 0) - new Date(a[key] || 0);
-  switch (sortBy) {
-    case 'title':
-      return arr.sort((a, b) => a.title.localeCompare(b.title));
-    case 'author':
-      return arr.sort((a, b) => a.author.localeCompare(b.author));
-    case 'progress':
-      return arr.sort((a, b) => b.progress - a.progress);
-    case 'pages':
-      return arr.sort((a, b) => b.pages - a.pages);
-    case 'rating':
-      return arr.sort((a, b) => (b.rating || 0) - (a.rating || 0));
-    case 'recentlyFinished':
-      return arr.sort(byDateDesc('finishedAt'));
-    case 'recentlyStarted':
-    default:
-      return arr.sort(byDateDesc('startedAt'));
-  }
-}
+const comparators = {
+  title: (a, b) => a.title.localeCompare(b.title),
+  author: (a, b) => a.author.localeCompare(b.author),
+  progress: (a, b) => b.progress - a.progress,
+  pages: (a, b) => b.pages - a.pages,
+  rating: (a, b) => (b.rating || 0) - (a.rating || 0),
+  recentlyFinished: (a, b) => new Date(b.finishedAt || 0) - new Date(a.finishedAt || 0),
+  recentlyStarted: (a, b) => new Date(b.startedAt || 0) - new Date(a.startedAt || 0),
+};
 
-export const SORT_OPTIONS = [
+const SORT_OPTIONS = [
   { id: 'recentlyStarted', label: 'Recently started' },
   { id: 'title', label: 'Title' },
   { id: 'author', label: 'Author' },
@@ -99,28 +65,47 @@ export const SORT_OPTIONS = [
   { id: 'recentlyFinished', label: 'Recently finished' },
 ];
 
-// ---- Memoized filter+sort+enrich (real memoization, same approach as goals) ----
-let lastKey = null;
-let lastResult = null;
-
-export function getVisibleBooks(allBooks, f) {
-  const key = JSON.stringify({
+// ---- Build cache key ----
+function buildKey(f, n) {
+  return {
     search: f.search,
     genre: [...f.genreFilter].sort(),
     status: [...f.statusFilter].sort(),
     fav: f.favoritesOnly,
     sort: f.sortBy,
-    n: allBooks.length,
-  });
-  if (key === lastKey) return lastResult;
-  lastKey = key;
-  lastResult = sortBooks(filterBooks(allBooks, f), f.sortBy).map(enrichBook);
-  return lastResult;
+    n,
+  };
 }
 
-export function invalidateVisibleBooksCache() {
-  lastKey = null;
-}
+// ---- Create the shared list state ----
+const listState = createListState({
+  moduleName: 'books',
+  initialState,
+  sortOptions: SORT_OPTIONS,
+  filterFn: createFilterFn(matchesBook),
+  sortFn: createSortFn(comparators, 'recentlyStarted'),
+  enrichFn: enrichBook,
+  buildKey,
+  resetKeys: ['search', 'genreFilter', 'statusFilter', 'favoritesOnly'],
+});
+
+// ---- Re-export standard API ----
+export const {
+  getState,
+  setState,
+  subscribe,
+  resetFilters,
+  filter: filterBooks,
+  sort: sortBooks,
+  getVisible: getVisibleBooks,
+  invalidateCache: invalidateVisibleBooksCache,
+} = listState;
+
+export { SORT_OPTIONS };
+
+// ---- Re-export date utils and enrichments for view.js ----
+export { formatDate, timeAgo, daysUntil };
+export { computeBookProgress, pagesRemaining };
 
 // ---- Statistics ----
 export function computeBookStats(allBooks) {

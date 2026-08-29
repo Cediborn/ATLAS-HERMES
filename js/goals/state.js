@@ -1,12 +1,13 @@
-// Atlas — Goals page state. Page-scoped (not the global store), same shape as
-// projects/state.js: filtering/sorting/progress/forecast are pure functions,
-// nothing here touches the DOM.
+// Atlas — Goals page state.
+// Uses shared list-state.js for filtering/sorting/memoization.
+// This file only defines Goals-specific config and enrichments.
 
 import { formatDate, timeAgo, daysUntil, dateKey, todayKey } from '../date-utils.js';
+import { createListState, createFilterFn, createSortFn } from '../list-state.js';
+import { PRIORITY_ORDER } from './data.js';
 
-const listeners = new Set();
-
-let state = {
+// ---- Page-scoped state ----
+const initialState = {
   search: '',
   typeFilter: null, // 'long' | 'short' | null
   categoryFilter: new Set(),
@@ -16,41 +17,52 @@ let state = {
   viewMode: 'grid', // 'grid' | 'list' | 'timeline'
 };
 
-export function getState() {
-  return state;
+// ---- Filtering (pure) ----
+function matchesGoal(g, f) {
+  const q = f.search.trim().toLowerCase();
+  if (!f.showArchived && g.archived) return false;
+  if (q && !g.title.toLowerCase().includes(q) && !g.description.toLowerCase().includes(q)) return false;
+  if (f.typeFilter && g.type !== f.typeFilter) return false;
+  if (f.categoryFilter.size && !f.categoryFilter.has(g.category)) return false;
+  if (f.statusFilter.size && !f.statusFilter.has(g.status)) return false;
+  return true;
 }
 
-export function setState(patch) {
-  state = { ...state, ...patch };
-  listeners.forEach((fn) => fn(state));
-}
+// ---- Sorting (pure) ----
+const comparators = {
+  progress: (a, b) => b.progress - a.progress,
+  priority: (a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority],
+  alphabetical: (a, b) => a.title.localeCompare(b.title),
+  recentlyCreated: (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0),
+  recentlyUpdated: (a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0),
+  deadline: (a, b) => {
+    if (!a.deadline && !b.deadline) return 0;
+    if (!a.deadline) return 1;
+    if (!b.deadline) return -1;
+    return new Date(a.deadline) - new Date(b.deadline);
+  },
+};
 
-export function subscribe(fn) {
-  listeners.add(fn);
-  return () => listeners.delete(fn);
-}
+const SORT_OPTIONS = [
+  { id: 'deadline', label: 'Deadline' },
+  { id: 'progress', label: 'Progress' },
+  { id: 'priority', label: 'Priority' },
+  { id: 'alphabetical', label: 'Alphabetical' },
+  { id: 'recentlyCreated', label: 'Recently created' },
+  { id: 'recentlyUpdated', label: 'Recently updated' },
+];
 
-export function resetFilters() {
-  setState({ search: '', typeFilter: null, categoryFilter: new Set(), statusFilter: new Set(), showArchived: false });
-}
-
-export { formatDate, timeAgo, daysUntil, dateKey, todayKey };
-
-// ---- Progress — derived from milestone completion, never stored ----
-export function computeGoalProgress(goal) {
+// ---- Enrichment ----
+function computeGoalProgress(goal) {
   const ms = goal.milestones || [];
   if (!ms.length) {
-    // No milestones? Fall back to an explicit stored value if present.
     return typeof goal.progress === 'number' ? goal.progress : 0;
   }
   const done = ms.filter((m) => m.done).length;
   return Math.round((done / ms.length) * 100);
 }
 
-// ---- Completion forecast (pure) — velocity-based estimate ----
-// Uses achieved %-per-day so far to project a completion date, then grades
-// confidence from how much buffer remains before the deadline.
-export function forecastGoal(goal) {
+function forecastGoal(goal) {
   const progress = computeGoalProgress(goal);
   if (goal.status === 'Completed') {
     return { estCompletion: goal.deadline, confidence: 'High', daysLeft: 0, onSchedule: true };
@@ -61,11 +73,11 @@ export function forecastGoal(goal) {
   const deadline = new Date(`${goal.deadline}T00:00:00`);
   const elapsedDays = Math.max(0, Math.round((today - start) / DAY_MS));
   const remainingDays = Math.max(0, Math.round((deadline - today) / DAY_MS));
-  const velocity = elapsedDays > 0 ? progress / elapsedDays : 0; // % per day
+  const velocity = elapsedDays > 0 ? progress / elapsedDays : 0;
   const estDays = velocity > 0 ? Math.ceil((100 - progress) / velocity) : remainingDays;
   const est = new Date(today);
   est.setDate(est.getDate() + estDays);
-  const buffer = deadline - est; // positive = finish before deadline
+  const buffer = deadline - est;
   const onSchedule = buffer >= 0;
   const confidence = goal.status === 'Blocked' ? 'Low' : buffer >= 14 * DAY_MS ? 'High' : buffer >= 0 ? 'Medium' : 'Low';
   return {
@@ -76,8 +88,7 @@ export function forecastGoal(goal) {
   };
 }
 
-// ---- Enriched goal: progress + forecast attached for presentation ----
-export function enrichGoal(goal) {
+function enrichGoal(goal) {
   return {
     ...goal,
     progress: computeGoalProgress(goal),
@@ -87,81 +98,51 @@ export function enrichGoal(goal) {
   };
 }
 
-// ---- Filtering (pure) ----
-export function filterGoals(list, f) {
-  const q = f.search.trim().toLowerCase();
-  return list.filter((g) => {
-    if (!f.showArchived && g.archived) return false;
-    if (q && !g.title.toLowerCase().includes(q) && !g.description.toLowerCase().includes(q)) return false;
-    if (f.typeFilter && g.type !== f.typeFilter) return false;
-    if (f.categoryFilter.size && !f.categoryFilter.has(g.category)) return false;
-    if (f.statusFilter.size && !f.statusFilter.has(g.status)) return false;
-    return true;
-  });
-}
-
-// ---- Sorting (pure) ----
-const PRIORITY_ORDER = { Critical: 0, High: 1, Medium: 2, Low: 3 };
-
-export function sortGoals(list, sortBy) {
-  const arr = [...list];
-  const byDateDesc = (key) => (a, b) => new Date(b[key] || 0) - new Date(a[key] || 0);
-  switch (sortBy) {
-    case 'progress':
-      return arr.sort((a, b) => b.progress - a.progress);
-    case 'priority':
-      return arr.sort((a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority]);
-    case 'alphabetical':
-      return arr.sort((a, b) => a.title.localeCompare(b.title));
-    case 'recentlyCreated':
-      return arr.sort(byDateDesc('createdAt'));
-    case 'recentlyUpdated':
-      return arr.sort(byDateDesc('updatedAt'));
-    case 'deadline':
-    default:
-      return arr.sort((a, b) => {
-        if (!a.deadline && !b.deadline) return 0;
-        if (!a.deadline) return 1;
-        if (!b.deadline) return -1;
-        return new Date(a.deadline) - new Date(b.deadline);
-      });
-  }
-}
-
-export const SORT_OPTIONS = [
-  { id: 'deadline', label: 'Deadline' },
-  { id: 'progress', label: 'Progress' },
-  { id: 'priority', label: 'Priority' },
-  { id: 'alphabetical', label: 'Alphabetical' },
-  { id: 'recentlyCreated', label: 'Recently created' },
-  { id: 'recentlyUpdated', label: 'Recently updated' },
-];
-
-// ---- Memoized filter+sort+enrich (real memoization, same approach as projects) ----
-let lastKey = null;
-let lastResult = null;
-
-export function getVisibleGoals(allGoals, f) {
-  const key = JSON.stringify({
+// ---- Build cache key ----
+function buildKey(f, n) {
+  return {
     search: f.search,
     type: f.typeFilter,
     cat: [...f.categoryFilter].sort(),
     status: [...f.statusFilter].sort(),
     arch: f.showArchived,
     sort: f.sortBy,
-    n: allGoals.length,
-  });
-  if (key === lastKey) return lastResult;
-  lastKey = key;
-  lastResult = sortGoals(filterGoals(allGoals, f), f.sortBy).map(enrichGoal);
-  return lastResult;
+    n,
+  };
 }
 
-export function invalidateVisibleGoalsCache() {
-  lastKey = null;
-}
+// ---- Create the shared list state ----
+const listState = createListState({
+  moduleName: 'goals',
+  initialState,
+  sortOptions: SORT_OPTIONS,
+  filterFn: createFilterFn(matchesGoal),
+  sortFn: createSortFn(comparators, 'deadline'),
+  enrichFn: enrichGoal,
+  buildKey,
+  resetKeys: ['search', 'typeFilter', 'categoryFilter', 'statusFilter', 'showArchived'],
+});
 
-// ---- Statistics — the numbers the stats strip and charts are built from ----
+// ---- Re-export standard API ----
+export const {
+  getState,
+  setState,
+  subscribe,
+  resetFilters,
+  filter: filterGoals,
+  sort: sortGoals,
+  getVisible: getVisibleGoals,
+  invalidateCache: invalidateVisibleGoalsCache,
+} = listState;
+
+// ---- Export SORT_OPTIONS for toolbar ----
+export { SORT_OPTIONS };
+
+// ---- Re-export date utils and enrichments for view.js ----
+export { formatDate, timeAgo, daysUntil, dateKey, todayKey };
+export { computeGoalProgress, forecastGoal, enrichGoal };
+
+// ---- Statistics ----
 export function computeGoalStats(allGoals) {
   const active = allGoals.filter((g) => g.status !== 'Completed' && g.status !== 'Archived');
   const completed = allGoals.filter((g) => g.status === 'Completed').length;
@@ -208,7 +189,7 @@ export function statusDistribution(allGoals) {
   return counts.map((c) => ({ ...c, pct: Math.round((c.count / max) * 100) }));
 }
 
-// ---- Timeline — milestones + goal deadlines merged into one chronological feed ----
+// ---- Timeline ----
 export function buildTimeline(allGoals, { windowStart = 7, windowEnd = 180, limit = 14 } = {}) {
   const today = new Date(`${todayKey()}T00:00:00`);
   const start = new Date(today);

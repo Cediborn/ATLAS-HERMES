@@ -1,12 +1,13 @@
-// Atlas — Learning page state. Page-scoped (not the global store), same shape
-// as projects/goals state: filtering/sorting/progress/stats are pure functions,
-// nothing here touches the DOM.
+// Atlas — Learning page state.
+// Uses shared list-state.js for filtering/sorting/memoization.
+// This file only defines Learning-specific config and enrichments.
 
 import { formatDate, timeAgo, daysUntil, todayKey } from '../date-utils.js';
+import { createListState, createFilterFn, createSortFn } from '../list-state.js';
+import { PRIORITY_ORDER } from './data.js';
 
-const listeners = new Set();
-
-let state = {
+// ---- Page-scoped state ----
+const initialState = {
   search: '',
   typeFilter: null, // 'course' | 'book' | 'article' | null
   subjectFilter: new Set(),
@@ -17,96 +18,34 @@ let state = {
   viewMode: 'grid', // 'grid' | 'list'
 };
 
-export function getState() {
-  return state;
-}
-
-export function setState(patch) {
-  state = { ...state, ...patch };
-  listeners.forEach((fn) => fn(state));
-}
-
-export function subscribe(fn) {
-  listeners.add(fn);
-  return () => listeners.delete(fn);
-}
-
-export function resetFilters() {
-  setState({ search: '', typeFilter: null, subjectFilter: new Set(), statusFilter: new Set(), favoritesOnly: false, showArchived: false });
-}
-
-export { formatDate, timeAgo, daysUntil, todayKey };
-
-// ---- Progress — derived from completed units, never stored ----
-export function computeResourceProgress(resource) {
-  const units = resource.units || [];
-  if (!units.length) {
-    return typeof resource.progress === 'number' ? resource.progress : 0;
-  }
-  const done = units.filter((u) => u.done).length;
-  return Math.round((done / units.length) * 100);
-}
-
-// ---- Estimated reading time left (pure) — rough %-of-total-times-left ----
-export function minutesRemaining(resource) {
-  const total = resource.estimatedMinutes || 0;
-  if (!total) return 0;
-  return Math.round(total * (1 - computeResourceProgress(resource) / 100));
-}
-
-// ---- Enriched resource: progress + unit counts attached for presentation ----
-export function enrichResource(resource) {
-  return {
-    ...resource,
-    progress: computeResourceProgress(resource),
-    unitsDone: (resource.units || []).filter((u) => u.done).length,
-    unitsTotal: (resource.units || []).length,
-  };
-}
-
 // ---- Filtering (pure) ----
-export function filterResources(list, f) {
+function matchesResource(r, f) {
   const q = f.search.trim().toLowerCase();
-  return list.filter((r) => {
-    if (!f.showArchived && r.archived) return false;
-    if (f.favoritesOnly && !r.favorite) return false;
-    if (q && !r.title.toLowerCase().includes(q) && !r.author.toLowerCase().includes(q) && !r.description.toLowerCase().includes(q)) return false;
-    if (f.typeFilter && r.type !== f.typeFilter) return false;
-    if (f.subjectFilter.size && !f.subjectFilter.has(r.subject)) return false;
-    if (f.statusFilter.size && !f.statusFilter.has(r.status)) return false;
-    return true;
-  });
+  if (!f.showArchived && r.archived) return false;
+  if (f.favoritesOnly && !r.favorite) return false;
+  if (q && !r.title.toLowerCase().includes(q) && !r.author.toLowerCase().includes(q) && !r.description.toLowerCase().includes(q)) return false;
+  if (f.typeFilter && r.type !== f.typeFilter) return false;
+  if (f.subjectFilter.size && !f.subjectFilter.has(r.subject)) return false;
+  if (f.statusFilter.size && !f.statusFilter.has(r.status)) return false;
+  return true;
 }
 
 // ---- Sorting (pure) ----
-const PRIORITY_ORDER = { Critical: 0, High: 1, Medium: 2, Low: 3 };
+const comparators = {
+  progress: (a, b) => b.progress - a.progress,
+  priority: (a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority],
+  alphabetical: (a, b) => a.title.localeCompare(b.title),
+  recentlyCreated: (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0),
+  dueDate: (a, b) => {
+    if (!a.dueDate && !b.dueDate) return 0;
+    if (!a.dueDate) return 1;
+    if (!b.dueDate) return -1;
+    return new Date(a.dueDate) - new Date(b.dueDate);
+  },
+  recentlyUpdated: (a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0),
+};
 
-export function sortResources(list, sortBy) {
-  const arr = [...list];
-  const byDateDesc = (key) => (a, b) => new Date(b[key] || 0) - new Date(a[key] || 0);
-  switch (sortBy) {
-    case 'progress':
-      return arr.sort((a, b) => b.progress - a.progress);
-    case 'priority':
-      return arr.sort((a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority]);
-    case 'alphabetical':
-      return arr.sort((a, b) => a.title.localeCompare(b.title));
-    case 'recentlyCreated':
-      return arr.sort(byDateDesc('createdAt'));
-    case 'dueDate':
-      return arr.sort((a, b) => {
-        if (!a.dueDate && !b.dueDate) return 0;
-        if (!a.dueDate) return 1;
-        if (!b.dueDate) return -1;
-        return new Date(a.dueDate) - new Date(b.dueDate);
-      });
-    case 'recentlyUpdated':
-    default:
-      return arr.sort(byDateDesc('updatedAt'));
-  }
-}
-
-export const SORT_OPTIONS = [
+const SORT_OPTIONS = [
   { id: 'recentlyUpdated', label: 'Recently updated' },
   { id: 'progress', label: 'Progress' },
   { id: 'dueDate', label: 'Due date' },
@@ -115,12 +54,34 @@ export const SORT_OPTIONS = [
   { id: 'recentlyCreated', label: 'Recently created' },
 ];
 
-// ---- Memoized filter+sort+enrich (real memoization, same approach as goals) ----
-let lastKey = null;
-let lastResult = null;
+// ---- Progress — derived from completed units, never stored ----
+function computeResourceProgress(resource) {
+  const units = resource.units || [];
+  if (!units.length) {
+    return typeof resource.progress === 'number' ? resource.progress : 0;
+  }
+  const done = units.filter((u) => u.done).length;
+  return Math.round((done / units.length) * 100);
+}
 
-export function getVisibleResources(allResources, f) {
-  const key = JSON.stringify({
+function minutesRemaining(resource) {
+  const total = resource.estimatedMinutes || 0;
+  if (!total) return 0;
+  return Math.round(total * (1 - computeResourceProgress(resource) / 100));
+}
+
+function enrichResource(resource) {
+  return {
+    ...resource,
+    progress: computeResourceProgress(resource),
+    unitsDone: (resource.units || []).filter((u) => u.done).length,
+    unitsTotal: (resource.units || []).length,
+  };
+}
+
+// ---- Build cache key ----
+function buildKey(f, n) {
+  return {
     search: f.search,
     type: f.typeFilter,
     subject: [...f.subjectFilter].sort(),
@@ -128,19 +89,41 @@ export function getVisibleResources(allResources, f) {
     fav: f.favoritesOnly,
     arch: f.showArchived,
     sort: f.sortBy,
-    n: allResources.length,
-  });
-  if (key === lastKey) return lastResult;
-  lastKey = key;
-  lastResult = sortResources(filterResources(allResources, f), f.sortBy).map(enrichResource);
-  return lastResult;
+    n,
+  };
 }
 
-export function invalidateVisibleResourcesCache() {
-  lastKey = null;
-}
+// ---- Create the shared list state ----
+const listState = createListState({
+  moduleName: 'learning',
+  initialState,
+  sortOptions: SORT_OPTIONS,
+  filterFn: createFilterFn(matchesResource),
+  sortFn: createSortFn(comparators, 'recentlyUpdated'),
+  enrichFn: enrichResource,
+  buildKey,
+  resetKeys: ['search', 'typeFilter', 'subjectFilter', 'statusFilter', 'favoritesOnly', 'showArchived'],
+});
 
-// ---- Statistics — the numbers the stats strip and charts are built from ----
+// ---- Re-export standard API ----
+export const {
+  getState,
+  setState,
+  subscribe,
+  resetFilters,
+  filter: filterResources,
+  sort: sortResources,
+  getVisible: getVisibleResources,
+  invalidateCache: invalidateVisibleResourcesCache,
+} = listState;
+
+export { SORT_OPTIONS };
+
+// ---- Re-export date utils and enrichments for view.js ----
+export { formatDate, timeAgo, daysUntil, todayKey };
+export { computeResourceProgress, minutesRemaining, enrichResource };
+
+// ---- Statistics ----
 export function computeLearningStats(allResources) {
   const active = allResources.filter((r) => r.status !== 'Completed' && r.status !== 'Archived');
   const completed = allResources.filter((r) => r.status === 'Completed').length;

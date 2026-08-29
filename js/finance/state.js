@@ -1,13 +1,13 @@
-// Atlas — Finance page state. Page-scoped (not the global store), same shape
-// as goals/learning state: balances/stats/filtering are pure functions, nothing
-// here touches the DOM.
+// Atlas — Finance page state.
+// Uses shared list-state.js for filtering/sorting/memoization.
+// This file only defines Finance-specific config and enrichments.
 
 import { formatDate, timeAgo, todayKey } from '../date-utils.js';
+import { createListState, createFilterFn, createSortFn } from '../list-state.js';
 import { accounts, transactions, CATEGORY_CONFIG } from './data.js';
 
-const listeners = new Set();
-
-let state = {
+// ---- Page-scoped state ----
+const initialState = {
   search: '',
   accountFilter: new Set(),
   categoryFilter: new Set(),
@@ -18,25 +18,8 @@ let state = {
   viewMode: 'overview', // 'overview' | 'transactions'
 };
 
-export function getState() {
-  return state;
-}
-
-export function setState(patch) {
-  state = { ...state, ...patch };
-  listeners.forEach((fn) => fn(state));
-}
-
-export function subscribe(fn) {
-  listeners.add(fn);
-  return () => listeners.delete(fn);
-}
-
-export function resetFilters() {
-  setState({ search: '', accountFilter: new Set(), categoryFilter: new Set(), statusFilter: new Set(), typeFilter: null, favoritesOnly: false });
-}
-
-export { formatDate, timeAgo, todayKey };
+const listeners = new Set();
+let state = { ...initialState };
 
 // ---- Money formatting (shared by components) ----
 const moneyFmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -108,51 +91,37 @@ export function cashFlowThisMonth() {
 }
 
 // ---- Filtering (pure) ----
-export function filterTransactions(f) {
+function matchesTransaction(t, f) {
   const q = f.search.trim().toLowerCase();
-  return transactions.filter((t) => {
-    if (q && !t.description.toLowerCase().includes(q)) return false;
-    if (f.typeFilter && t.type !== f.typeFilter) return false;
-    if (f.favoritesOnly && !t.favorite) return false;
-    if (f.accountFilter.size && !f.accountFilter.has(t.accountId)) return false;
-    if (f.categoryFilter.size && !f.categoryFilter.has(t.category)) return false;
-    if (f.statusFilter.size && !f.statusFilter.has(t.status)) return false;
-    return true;
-  });
+  if (q && !t.description.toLowerCase().includes(q)) return false;
+  if (f.typeFilter && t.type !== f.typeFilter) return false;
+  if (f.favoritesOnly && !t.favorite) return false;
+  if (f.accountFilter.size && !f.accountFilter.has(t.accountId)) return false;
+  if (f.categoryFilter.size && !f.categoryFilter.has(t.category)) return false;
+  if (f.statusFilter.size && !f.statusFilter.has(t.status)) return false;
+  return true;
 }
 
 // ---- Sorting (pure) ----
-export function sortTransactions(list, sortBy) {
-  const arr = [...list];
-  switch (sortBy) {
-    case 'amountHigh':
-      return arr.sort((a, b) => b.amount - a.amount);
-    case 'amountLow':
-      return arr.sort((a, b) => a.amount - b.amount);
-    case 'category':
-      return arr.sort((a, b) => (CATEGORY_CONFIG[a.category].label || a.category).localeCompare(CATEGORY_CONFIG[b.category].label || b.category));
-    case 'oldest':
-      return arr.sort((a, b) => new Date(a.date) - new Date(b.date));
-    case 'recentlyAdded':
-    default:
-      return arr.sort((a, b) => new Date(b.date) - new Date(a.date));
-  }
-}
+const comparators = {
+  amountHigh: (a, b) => b.amount - a.amount,
+  amountLow: (a, b) => a.amount - b.amount,
+  category: (a, b) => (CATEGORY_CONFIG[a.category].label || a.category).localeCompare(CATEGORY_CONFIG[b.category].label || b.category),
+  oldest: (a, b) => new Date(a.date) - new Date(b.date),
+  recentlyAdded: (a, b) => new Date(b.date) - new Date(a.date),
+};
 
-export const SORT_OPTIONS = [
+const SORT_OPTIONS = [
   { id: 'recentlyAdded', label: 'Newest' },
   { id: 'oldest', label: 'Oldest' },
-  { id: 'amountHigh', label: 'Amount (high \u2192 low)' },
-  { id: 'amountLow', label: 'Amount (low \u2192 high)' },
+  { id: 'amountHigh', label: 'Amount (high → low)' },
+  { id: 'amountLow', label: 'Amount (low → high)' },
   { id: 'category', label: 'Category' },
 ];
 
-// ---- Memoized filter+sort (real memoization, same approach as goals) ----
-let lastKey = null;
-let lastResult = null;
-
-export function getVisibleTransactions(f) {
-  const key = JSON.stringify({
+// ---- Build cache key ----
+function buildKey(f) {
+  return {
     search: f.search,
     account: [...f.accountFilter].sort(),
     category: [...f.categoryFilter].sort(),
@@ -160,16 +129,36 @@ export function getVisibleTransactions(f) {
     type: f.typeFilter,
     fav: f.favoritesOnly,
     sort: f.sortBy,
-  });
-  if (key === lastKey) return lastResult;
-  lastKey = key;
-  lastResult = sortTransactions(filterTransactions(f), f.sortBy);
-  return lastResult;
+  };
 }
 
-export function invalidateVisibleTransactionsCache() {
-  lastKey = null;
-}
+// ---- Create the shared list state ----
+const listState = createListState({
+  moduleName: 'finance',
+  initialState,
+  sortOptions: SORT_OPTIONS,
+  filterFn: createFilterFn(matchesTransaction),
+  sortFn: createSortFn(comparators, 'recentlyAdded'),
+  buildKey: (f) => buildKey(f), // finance doesn't use list length in key
+  resetKeys: ['search', 'accountFilter', 'categoryFilter', 'statusFilter', 'typeFilter', 'favoritesOnly'],
+});
+
+// ---- Re-export standard API ----
+export const {
+  getState,
+  setState,
+  subscribe,
+  resetFilters,
+  filter: filterTransactions,
+  sort: sortTransactions,
+  getVisible: getVisibleTransactions,
+  invalidateCache: invalidateVisibleTransactionsCache,
+} = listState;
+
+export { SORT_OPTIONS };
+
+// ---- Re-export date utils for view.js ----
+export { formatDate, timeAgo, todayKey };
 
 // ---- Group transactions by date for the grouped list ----
 export function groupByDate(list) {
