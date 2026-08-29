@@ -4,7 +4,7 @@
 // refreshed in the background (stale-while-revalidate). Bump VERSION when
 // deploying a new build so clients drop the old cache and pick it up.
 
-const VERSION = 'atlas-v11';
+const VERSION = 'atlas-v12';
 const CACHE = `atlas-${VERSION}`;
 const SHELL = [
   './index.html',
@@ -79,6 +79,20 @@ const SHELL = [
   '../js/finance/data.js',
   '../js/finance/components.js',
   '../js/finance/dialog.js',
+  // Books modules
+  '../js/books/view.js',
+  '../js/books/state.js',
+  '../js/books/data.js',
+  '../js/books/components.js',
+  '../js/books/dialog.js',
+  // Coding modules
+  '../js/coding/view.js',
+  '../js/coding/state.js',
+  '../js/coding/data.js',
+  '../js/coding/components.js',
+  '../js/coding/dialog.js',
+  // Shared utilities
+  '../js/list-state.js',
 
   // CSS
   '../css/tokens.css',
@@ -93,7 +107,8 @@ const SHELL = [
   '../css/goals.css',
   '../css/learning.css',
   '../css/finance.css',
-
+  '../css/books.css',
+  '../css/coding.css',
   '../css/luna.css',
   '../css/landing.css',
 ];
