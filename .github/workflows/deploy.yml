@@ -1,0 +1,73 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run tests
+        run: node tests/test-runner.mjs
+
+      - name: Verify all route modules exist
+        run: |
+          missing=0
+          for mod in \
+            js/projects/view.js \
+            js/notes/view.js \
+            js/calendar/view.js \
+            js/habits/view.js \
+            js/goals/view.js \
+            js/learning/view.js \
+            js/finance/view.js \
+            js/books/view.js \
+            js/coding/view.js; do
+            if [ ! -f "$mod" ]; then
+              echo "MISSING: $mod"
+              missing=1
+            fi
+          done
+          if [ "$missing" = "1" ]; then
+            echo "Route module verification failed"
+            exit 1
+          fi
+          echo "All route modules present"
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
